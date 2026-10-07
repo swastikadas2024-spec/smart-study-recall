@@ -1,0 +1,15 @@
+{
+    "features": [
+        "log_history_seen",
+        "historical_accuracy",
+        "log_delta_days"
+    ],
+    "coefficients": [
+        -0.09048363675425963,
+        2.049082841447131,
+        -0.14206260698399323
+    ],
+    "intercept": 1.054988931881354,
+    "mae": 0.14876686329899322,
+    "rmse": 0.2649587765612605
+}

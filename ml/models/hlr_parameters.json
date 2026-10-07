@@ -1,0 +1,13 @@
+{
+    "features": [
+        "log_history_seen",
+        "historical_accuracy"
+    ],
+    "parameters": [
+        0.8724357131195032,
+        5.188306893748473
+    ],
+    "target_retention": 0.8,
+    "mae": 0.10973546759157699,
+    "rmse": 0.2859939884352987
+}
