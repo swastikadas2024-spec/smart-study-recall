@@ -1,0 +1,39 @@
+{
+  "model_name": "Two-layer GRU recall regressor",
+  "framework": "PyTorch",
+  "dataset": "settles.acl16.learning_traces.13m.csv.gz",
+  "rows_loaded": 200000,
+  "valid_rows": 200000,
+  "sequences": 194870,
+  "sequence_length": 10,
+  "features": [
+    "log_history_seen",
+    "historical_accuracy",
+    "delta_days",
+    "log_delta_days"
+  ],
+  "target": "session_correct / session_seen",
+  "target_type": "session-level recall rate",
+  "split": {
+    "train": 0.7,
+    "validation": 0.15,
+    "test": 0.15,
+    "ordering": "chronological by target timestamp"
+  },
+  "best_epoch": 7,
+  "best_validation_mse": 0.07361806220932597,
+  "gru_test_mae": 0.17010605633911327,
+  "gru_test_rmse": 0.27379746203269756,
+  "rf1_test_mae": 0.17261671042009608,
+  "rf1_test_rmse": 0.27173867587596723,
+  "mean_baseline_test_mae": 0.17736096680164337,
+  "mean_baseline_test_rmse": 0.2779828485191073,
+  "seed": 42,
+  "calibrated": false,
+  "limitations": [
+    "Development experiment using a dataset prefix.",
+    "Timestamp ties preserve source order; true event order may be unknown.",
+    "Chronological splitting does not guarantee user-independent evaluation.",
+    "Predictions estimate session-level recall rate, not a validated individual future-recall probability."
+  ]
+}

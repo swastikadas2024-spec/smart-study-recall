@@ -1,0 +1,39 @@
+{
+  "model_name": "GRU v3 learner-item sequence regressor",
+  "framework": "PyTorch",
+  "rows_loaded": 200000,
+  "valid_rows": 199998,
+  "sequence_length": 10,
+  "features": [
+    "log_history_seen",
+    "historical_accuracy",
+    "delta_days",
+    "log_delta_days"
+  ],
+  "target": "session_correct / session_seen",
+  "grouping": [
+    "user_id",
+    "lexeme_id"
+  ],
+  "split": "70/15/15 chronological",
+  "best_epoch": 9,
+  "best_validation_mse": 0.07337665232687683,
+  "gru_test": {
+    "mae": 0.17459030382384857,
+    "rmse": 0.27375536005980383
+  },
+  "matched_random_forest_test": {
+    "mae": 0.17354207364112664,
+    "rmse": 0.27418338074389653
+  },
+  "mean_baseline_test": {
+    "mae": 0.17718917807489634,
+    "rmse": 0.2774898011093579
+  },
+  "limitations": [
+    "Uses a 200,000-row source prefix rather than the full dataset.",
+    "The test set is not user-independent.",
+    "Target is observed session-level recall, not validated future retention probability.",
+    "A prefix sample may not represent the entire dataset."
+  ]
+}
