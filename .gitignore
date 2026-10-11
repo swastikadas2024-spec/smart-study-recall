@@ -8,3 +8,11 @@ ml/data/processed/
 
 .vscode/
 .env
+
+# Python cache and local environment files
+.env
+backend/.env
+__pycache__/
+*.pyc
+# Large raw dataset
+ml/data/raw/

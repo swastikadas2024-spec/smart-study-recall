@@ -1,0 +1,19 @@
+{
+  "model_name": "Random Forest RF-1",
+  "n_estimators": 100,
+  "max_depth": 10,
+  "min_samples_leaf": 10,
+  "random_state": 42,
+  "training_rows": 850005,
+  "dataset_rows_loaded": 1000000,
+  "training_cutoff": "2013-03-01 15:24:16",
+  "features": [
+    "log_history_seen",
+    "historical_accuracy",
+    "delta_days",
+    "log_delta_days"
+  ],
+  "target": "session_correct / session_seen",
+  "target_type": "session-level recall rate",
+  "calibrated": false
+}

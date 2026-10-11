@@ -1,10 +1,11 @@
 import json
-
+from sklearn.metrics import brier_score_loss
+from sklearn.calibration import calibration_curve
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-from calibrate_recall import (
+from caliberate_recall import (
     train_calibrator,
     get_hlr_predictions,
 )
@@ -167,3 +168,77 @@ print("HLR after calibration")
 print("---------------------")
 print("MAE :", calibrated_mae)
 print("RMSE:", calibrated_rmse)
+# Calibration quality for continuous recall targets
+raw_calibration_error = np.mean(
+    np.abs(test_predictions - actual)
+)
+
+calibrated_calibration_error = np.mean(
+    np.abs(calibrated_predictions - actual)
+)
+
+print()
+print("Calibration quality")
+print("--------------------")
+print("Raw HLR calibration error       :", raw_calibration_error)
+print("Calibrated HLR calibration error:", calibrated_calibration_error)
+
+# Calibration quality for continuous recall target
+raw_calibration_error = np.mean(
+    np.abs(test_predictions - actual)
+)
+
+calibrated_calibration_error = np.mean(
+    np.abs(calibrated_predictions - actual)
+)
+
+print()
+print("Calibration quality")
+print("--------------------")
+print("Raw HLR calibration error       :", raw_calibration_error)
+print("Calibrated HLR calibration error:", calibrated_calibration_error)
+
+# Continuous reliability analysis
+bins = np.linspace(0, 1, 11)
+
+print()
+print("Reliability analysis")
+print("--------------------")
+print("Bin        Raw Predicted   Raw Actual   Calibrated Predicted   Calibrated Actual")
+
+for i in range(len(bins) - 1):
+
+    lower = bins[i]
+    upper = bins[i + 1]
+
+    raw_mask = (
+        (test_predictions >= lower) &
+        (test_predictions < upper)
+    )
+
+    cal_mask = (
+        (calibrated_predictions >= lower) &
+        (calibrated_predictions < upper)
+    )
+
+    if raw_mask.sum() > 0:
+        raw_pred_mean = test_predictions[raw_mask].mean()
+        raw_actual_mean = actual[raw_mask].mean()
+    else:
+        raw_pred_mean = np.nan
+        raw_actual_mean = np.nan
+
+    if cal_mask.sum() > 0:
+        cal_pred_mean = calibrated_predictions[cal_mask].mean()
+        cal_actual_mean = actual[cal_mask].mean()
+    else:
+        cal_pred_mean = np.nan
+        cal_actual_mean = np.nan
+
+    print(
+        f"{lower:.1f}-{upper:.1f}   "
+        f"{raw_pred_mean:.4f}         "
+        f"{raw_actual_mean:.4f}       "
+        f"{cal_pred_mean:.4f}                 "
+        f"{cal_actual_mean:.4f}"
+    )
