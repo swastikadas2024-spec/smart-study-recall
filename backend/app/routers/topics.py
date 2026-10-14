@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_student, require_student_owner
 from app.database import get_db
 from app.models import Profile, Topic
 
@@ -34,7 +35,11 @@ class TopicResponse(BaseModel):
 def create_topic(
     topic: TopicCreate,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
+    # Only allow the authenticated student to create their own topics.
+    require_student_owner(topic.student_id, current_student)
+
     topic_name = topic.topic_name.strip()
 
     if not topic_name:
@@ -65,17 +70,26 @@ def create_topic(
 
 @router.get("", response_model=list[TopicResponse])
 def list_topics(
-    student_id: int = None,
+    student_id: int | None = None,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
-    statement = select(Topic).order_by(Topic.id)
-
+    # Preserve the optional student_id parameter, but never expose
+    # topics belonging to another student.
     if student_id is not None:
         if student_id <= 0:
             raise HTTPException(
                 status_code=422,
                 detail="student_id must be positive.",
             )
-        statement = statement.where(Topic.student_id == student_id)
+
+        require_student_owner(student_id, current_student)
+
+    statement = (
+        select(Topic)
+        .where(Topic.student_id == current_student.id)
+        .order_by(Topic.id)
+    )
 
     return db.scalars(statement).all()
+

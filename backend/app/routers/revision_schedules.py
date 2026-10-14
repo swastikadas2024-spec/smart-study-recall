@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_student, require_student_owner
 from app.database import get_db
 from app.models import Profile, RevisionSchedule, Topic
 
@@ -40,7 +41,11 @@ class RevisionResponse(BaseModel):
 def create_revision(
     revision: RevisionCreate,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
+    # Students can schedule revisions only for themselves.
+    require_student_owner(revision.student_id, current_student)
+
     student = db.get(Profile, revision.student_id)
 
     if student is None:
@@ -80,6 +85,7 @@ def create_revision(
 def list_revisions(
     student_id: int,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
     if student_id <= 0:
         raise HTTPException(
@@ -87,9 +93,11 @@ def list_revisions(
             detail="student_id must be positive.",
         )
 
+    require_student_owner(student_id, current_student)
+
     statement = (
         select(RevisionSchedule)
-        .where(RevisionSchedule.student_id == student_id)
+        .where(RevisionSchedule.student_id == current_student.id)
         .order_by(RevisionSchedule.scheduled_at)
     )
 
@@ -103,8 +111,21 @@ def list_revisions(
 def complete_revision(
     revision_id: int,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
-    revision = db.get(RevisionSchedule, revision_id)
+    if revision_id <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="revision_id must be positive.",
+        )
+
+    # Fetch only a revision belonging to the authenticated student.
+    statement = select(RevisionSchedule).where(
+        RevisionSchedule.id == revision_id,
+        RevisionSchedule.student_id == current_student.id,
+    )
+
+    revision = db.scalar(statement)
 
     if revision is None:
         raise HTTPException(

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_student
 from app.database import get_db
 from app.models import Profile
 
@@ -33,10 +34,38 @@ class StudentResponse(BaseModel):
 def create_student(
     student: StudentCreate,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
+    # An authenticated user cannot create a profile for another email.
+    if student.email and str(student.email).lower() != (
+        current_student.email or ""
+    ).lower():
+        raise HTTPException(
+            status_code=403,
+            detail="You can only use your own account email.",
+        )
+
+    # Prevent creating another profile for the same authenticated user.
+    existing_profile = db.scalar(
+        select(Profile).where(
+            Profile.supabase_user_id == current_student.supabase_user_id
+        )
+    )
+
+    if existing_profile is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Your student profile already exists.",
+        )
+
     new_student = Profile(
         student_name=student.student_name.strip(),
-        email=str(student.email) if student.email else None,
+        email=(
+            str(student.email)
+            if student.email
+            else current_student.email
+        ),
+        supabase_user_id=current_student.supabase_user_id,
     )
 
     if not new_student.student_name:
@@ -60,6 +89,18 @@ def create_student(
 
 
 @router.get("", response_model=list[StudentResponse])
-def list_students(db: Session = Depends(get_db)):
-    statement = select(Profile).order_by(Profile.id)
+def list_students(
+    db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
+):
+    statement = select(Profile).where(
+        Profile.id == current_student.id
+    )
     return db.scalars(statement).all()
+
+
+@router.get("/me", response_model=StudentResponse)
+def get_my_profile(
+    current_student: Profile = Depends(get_current_student),
+):
+    return current_student
