@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_student, require_student_owner
 from app.database import get_db
 from app.models import LearningEvent, Profile, Topic
 
@@ -41,7 +42,11 @@ class LearningEventResponse(BaseModel):
 def create_learning_event(
     event: LearningEventCreate,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
+    # A student can create learning events only for themselves.
+    require_student_owner(event.student_id, current_student)
+
     if event.questions_correct > event.questions_seen:
         raise HTTPException(
             status_code=422,
@@ -81,6 +86,7 @@ def create_learning_event(
 def list_learning_events(
     student_id: int,
     db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
 ):
     if student_id <= 0:
         raise HTTPException(
@@ -88,9 +94,11 @@ def list_learning_events(
             detail="student_id must be positive.",
         )
 
+    require_student_owner(student_id, current_student)
+
     statement = (
         select(LearningEvent)
-        .where(LearningEvent.student_id == student_id)
+        .where(LearningEvent.student_id == current_student.id)
         .order_by(LearningEvent.event_time.desc())
     )
 

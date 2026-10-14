@@ -7,6 +7,7 @@ from sqlalchemy import (
     Identity,
     Integer,
     String,
+    Uuid
     UniqueConstraint,
     func,
 )
@@ -21,6 +22,10 @@ class Profile(Base):
 
     id: Mapped[int] = mapped_column(
         BigInteger, Identity(), primary_key=True
+    )
+        supabase_user_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
+        nullable=True,
     )
     student_name: Mapped[str] = mapped_column(
         String(100), nullable=False

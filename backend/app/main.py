@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,13 +12,16 @@ from app.routers.revision_schedules import (
     router as revision_schedules_router,
 )
 from app.routers.predictions import router as predictions_router
+from app.routers.dashboard import router as dashboard_router
+from app.routers.recommendations import router as recommendations_router
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Backend API for the Smart Study Recall learning platform.",
 )
-
+app.include_router(recommendations_router)
+app.include_router(dashboard_router)
 app.include_router(students_router)
 app.include_router(topics_router)
 app.include_router(learning_events_router)
