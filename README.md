@@ -1,4 +1,5 @@
 Smart Study Recall
+
 Smart Study Recall is a study tracker that estimates when each topic will be forgotten, shows that date, and generates quizzes to help you review before it happens. It records study time, quiz results and recall checks, and turns them into a revision plan.
 The project has three parts that run together during development:
 Part	Folder	Port	Purpose
