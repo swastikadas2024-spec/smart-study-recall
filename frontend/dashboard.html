@@ -1,0 +1,91 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/model.js" defer></script>
+  <script src="js/local.js" defer></script>
+  <script src="js/effects.js" defer></script>
+  <script src="js/dashboard.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="dashboard.html">Smart Study Recall</a>
+    <nav class="app-nav" aria-label="Main">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="topics.html">Topics</a>
+      <a href="study.html">Study</a>
+      <a href="planner.html">Planner</a>
+      <a href="progress.html">Progress</a>
+      <a href="profile.html">Profile</a>
+    </nav>
+    <button class="btn ghost small" type="button" data-signout>Sign out</button>
+  </header>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" class="app">
+    <section class="page-title">
+      <p class="eyebrow">Dashboard</p>
+      <h1 id="greeting" class="display">Hello.</h1>
+      <p class="page-lede">What you studied, when each topic is due to be remembered, and what comes next.</p>
+    </section>
+    <p id="pageError" class="notice warn" role="alert" hidden></p>
+
+    <section class="section" aria-labelledby="statsTitle">
+      <h2 id="statsTitle" class="sr-only">Totals</h2>
+      <div id="statGrid" class="stat-grid"></div>
+    </section>
+
+    <section class="section two-col">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Forgetting forecast</h2>
+          <span class="tag estimate">Estimate</span>
+        </div>
+        <p class="muted" style="margin-bottom:14px">When each topic is predicted to fall to 80% recall, from your recorded answers and the days since you last studied it. Prototype model, not calibrated.</p>
+        <ul id="forecastList" class="rows"></ul>
+      </div>
+      <div class="panel">
+        <h2 class="panel-title">Today</h2>
+        <div class="profile-grid">
+          <div class="kv"><dt>Focus time today</dt><dd id="todayMinutes">0 min</dd></div>
+          <div class="kv"><dt>Topics due for recall</dt><dd id="dueNow">0</dd></div>
+        </div>
+        <p class="muted" style="margin-top:14px">Focus time is timed in this browser. <a href="study.html">Start a focus session</a> or <a href="study.html#quiz">generate a quiz</a>.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Questions this week</h2>
+          <span id="weekTotal" class="muted"></span>
+        </div>
+        <div id="weekChart" class="bars" role="img" aria-label="Questions answered per day for the last 7 days"></div>
+      </div>
+    </section>
+
+    <section class="section two-col">
+      <div class="panel">
+        <h2 class="panel-title">Needs attention</h2>
+        <ul id="attention" class="rows"></ul>
+      </div>
+      <div class="panel">
+        <h2 class="panel-title">Upcoming revisions</h2>
+        <ul id="upcoming" class="rows"></ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="panel">
+        <h2 class="panel-title">Recent activity</h2>
+        <ul id="recent" class="rows"></ul>
+      </div>
+    </section>
+  </main>
+  <footer class="foot"><p class="muted">Priorities are rule-based. Forgetting dates and recall figures are model estimates, labelled wherever they appear.</p></footer>
+</body></html>

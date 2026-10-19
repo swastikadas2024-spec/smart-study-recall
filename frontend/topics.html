@@ -1,0 +1,97 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · Topics</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/model.js" defer></script>
+  <script src="js/local.js" defer></script>
+  <script src="js/effects.js" defer></script>
+  <script src="js/topics.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="dashboard.html">Smart Study Recall</a>
+    <nav class="app-nav" aria-label="Main">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="topics.html">Topics</a>
+      <a href="study.html">Study</a>
+      <a href="planner.html">Planner</a>
+      <a href="progress.html">Progress</a>
+      <a href="profile.html">Profile</a>
+    </nav>
+    <button class="btn ghost small" type="button" data-signout>Sign out</button>
+  </header>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" class="app">
+    <section class="page-title">
+      <p class="eyebrow">Topics</p>
+      <h1 class="display">Topics</h1>
+      <p class="page-lede">Add what you study, write its flashcard, log sessions, and see when each topic will be forgotten.</p>
+    </section>
+    <p id="pageError" class="notice warn" role="alert" hidden></p>
+
+    <section class="section" aria-labelledby="addTitle">
+      <div class="section-head"><h2 id="addTitle" class="display">Add a topic</h2></div>
+      <form id="topicForm" class="panel form-grid">
+        <label>Topic name<input name="topic_name" type="text" required maxlength="200" placeholder="e.g. Binary search trees" /></label>
+        <label>Subject <span class="muted">(optional)</span><input name="subject" type="text" maxlength="60" placeholder="e.g. Data structures" /></label>
+        <div class="span-2 form-actions"><button class="btn primary" type="submit">Add topic</button></div>
+      </form>
+    </section>
+
+    <section class="section" aria-labelledby="logTitle">
+      <div class="section-head">
+        <h2 id="logTitle" class="display">Log a session</h2>
+        <span class="muted">How many questions you tried, and how many you got right.</span>
+      </div>
+      <form id="sessionForm" class="panel form-grid">
+        <label>Topic<select name="topic_id" id="sessionTopic" required></select></label>
+        <label>Questions attempted<input name="questions_seen" type="number" min="1" max="10000" step="1" required /></label>
+        <label>Correct answers<input name="questions_correct" type="number" min="0" max="10000" step="1" required /></label>
+        <div class="span-2 form-actions"><button class="btn primary" type="submit">Save session</button></div>
+      </form>
+    </section>
+
+    <section class="section" aria-labelledby="listTitle">
+      <div class="section-head">
+        <h2 id="listTitle" class="display">Your topics</h2>
+        <span id="topicCount" class="muted"></span>
+      </div>
+      <div id="topicList" class="topic-grid"></div>
+      <p id="emptyTopics" class="empty" hidden>No topics yet. Add one above.</p>
+    </section>
+  </main>
+
+  <dialog id="editDialog" class="dialog" aria-labelledby="editTitle">
+    <h2 id="editTitle" class="display">Edit topic</h2>
+    <form id="editForm" class="form-stack">
+      <input type="hidden" name="id" />
+      <label>Topic name<input name="topic_name" type="text" required maxlength="200" /></label>
+      <label>Subject <span class="muted">(optional)</span><input name="subject" type="text" maxlength="60" /></label>
+      <div class="form-actions">
+        <button id="editCancel" class="btn ghost" type="button">Cancel</button>
+        <button class="btn primary" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="cardDialog" class="dialog" aria-labelledby="cardTitle">
+    <h2 id="cardTitle" class="display">Flashcard</h2>
+    <p class="muted" style="margin-bottom:16px">Kept in this browser only, so the quiz can use it. Your scores are saved to your account.</p>
+    <form id="cardForm" class="form-stack">
+      <input type="hidden" name="topic_id" />
+      <label>Question<textarea name="question" rows="2" maxlength="300" required placeholder="e.g. What is the average search cost of a balanced BST?"></textarea></label>
+      <label>Answer<textarea name="answer" rows="3" maxlength="500" required placeholder="The answer you want to remember"></textarea></label>
+      <div class="form-actions">
+        <button id="cardDelete" class="btn ghost danger" type="button">Remove card</button>
+        <button id="cardCancel" class="btn ghost" type="button">Cancel</button>
+        <button class="btn primary" type="submit">Save card</button>
+      </div>
+    </form>
+  </dialog>
+</body></html>

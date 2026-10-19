@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · Log in</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/login.js" defer></script>
+</head>
+<body class="auth-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="auth-layout">
+    <section class="auth-hero" aria-labelledby="heroTitle">
+      <a class="wordmark" href="index.html">Smart Study Recall</a>
+      <div>
+        <h1 id="heroTitle" class="display hero-title">Study less.<br />Remember more.</h1>
+      </div>
+      <p class="hero-sentence">Log what you study, check it from memory, and see when each topic is due for review.</p>
+    </section>
+
+    <main id="main" class="auth-panel">
+      <p id="configWarn" class="notice warn" hidden><strong>Not configured yet.</strong> Open <code>frontend/js/config.js</code> and paste your Supabase URL and anon key.</p>
+
+      <div class="tabs" role="tablist" aria-label="Account">
+        <button type="button" role="tab" class="tab is-active" data-tab="login" aria-selected="true">Log in</button>
+        <button type="button" role="tab" class="tab" data-tab="signup" aria-selected="false">Create account</button>
+        <button type="button" role="tab" class="tab" data-tab="forgot" aria-selected="false">Forgot password</button>
+      </div>
+
+      <p id="authMsg" class="auth-msg" role="alert" hidden></p>
+
+      <form id="loginForm" class="form-stack" data-panel="login">
+        <label>Email<input name="email" type="email" required autocomplete="email" /></label>
+        <label>Password<input name="password" type="password" required autocomplete="current-password" /></label>
+        <div class="form-actions"><button class="btn primary wide" type="submit">Log in</button></div>
+      </form>
+
+      <form id="signupForm" class="form-stack" data-panel="signup" hidden>
+        <label>Full name<input name="full_name" type="text" required maxlength="100" autocomplete="name" /></label>
+        <label>Email<input name="email" type="email" required autocomplete="email" /></label>
+        <label>Password <span class="muted">(at least 8 characters)</span><input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+        <div class="form-actions"><button class="btn primary wide" type="submit">Create account</button></div>
+      </form>
+
+      <form id="forgotForm" class="form-stack" data-panel="forgot" hidden>
+        <label>Email<input name="email" type="email" required autocomplete="email" /></label>
+        <div class="form-actions"><button class="btn primary wide" type="submit">Send reset link</button></div>
+      </form>
+
+      <form id="resetForm" class="form-stack" data-panel="reset" hidden>
+        <p class="muted">Choose a new password for your account.</p>
+        <label>New password<input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+        <label>Confirm new password<input name="confirm" type="password" required minlength="8" autocomplete="new-password" /></label>
+        <div class="form-actions"><button class="btn primary wide" type="submit">Save password</button></div>
+      </form>
+    </main>
+  </div>
+</body>
+</html>

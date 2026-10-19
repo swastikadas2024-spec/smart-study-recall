@@ -1,0 +1,100 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · Progress</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/model.js" defer></script>
+  <script src="js/effects.js" defer></script>
+  <script src="js/progress.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="dashboard.html">Smart Study Recall</a>
+    <nav class="app-nav" aria-label="Main">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="topics.html">Topics</a>
+      <a href="study.html">Study</a>
+      <a href="planner.html">Planner</a>
+      <a href="progress.html">Progress</a>
+      <a href="profile.html">Profile</a>
+    </nav>
+    <button class="btn ghost small" type="button" data-signout>Sign out</button>
+  </header>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" class="app">
+    <section class="page-title">
+      <p class="eyebrow">Progress</p>
+      <h1 class="display">Progress</h1>
+      <p class="page-lede">Measured results from your own answers, shown apart from model estimates.</p>
+    </section>
+    <p id="pageError" class="notice warn" role="alert" hidden></p>
+
+    <section class="section" aria-labelledby="measuredTitle">
+      <div class="section-head">
+        <h2 id="measuredTitle" class="display">Measured accuracy</h2>
+        <span class="muted">Overall: <strong id="overallAccuracy">—</strong> · from your recorded answers</span>
+      </div>
+      <div class="panel data-wrap">
+        <table class="data">
+          <thead>
+            <tr><th scope="col">Topic</th><th scope="col">Sessions</th><th scope="col">Questions</th><th scope="col">Accuracy</th><th scope="col">Trend</th></tr>
+          </thead>
+          <tbody id="measuredBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="curveTitle">
+      <div class="section-head">
+        <h2 id="curveTitle" class="display">Forgetting curve</h2>
+        <span class="tag estimate">Estimate</span>
+      </div>
+      <div class="panel">
+        <div class="form-grid" style="margin-bottom:20px">
+          <label>Topic<select id="curveTopic"></select></label>
+          <label>Look ahead<select id="curveDays">
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="60">60 days</option>
+            <option value="120">120 days</option>
+          </select></label>
+        </div>
+        <div id="curveOut"></div>
+        <p class="muted" style="margin-top:14px">Predicted recall falls as 2<sup>−t/H</sup>, where H is estimated from your recorded answers. The dashed line marks 80%. Prototype model, not calibrated. Beyond 60 days, treat it as a rough guide.</p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="activityTitle">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 id="activityTitle" class="panel-title">Activity over time</h2>
+          <span id="activityTotal" class="muted"></span>
+        </div>
+        <div id="activity" class="bars" role="img" aria-label="Questions answered per week for the last 8 weeks"></div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="completionTitle">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 id="completionTitle" class="panel-title">Revision completion</h2>
+          <span id="completionRate" class="stat-value">—</span>
+        </div>
+        <p id="completionDetail" class="muted"></p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="estTitle">
+      <div class="section-head">
+        <h2 id="estTitle" class="display">Model estimates</h2>
+        <span class="muted">Experimental. Not measured results, and not calibrated.</span>
+      </div>
+      <ul id="estimateList" class="rows"></ul>
+    </section>
+  </main>
+</body></html>

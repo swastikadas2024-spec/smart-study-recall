@@ -1,0 +1,73 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · Profile</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/local.js" defer></script>
+  <script src="js/effects.js" defer></script>
+  <script src="js/profile.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="dashboard.html">Smart Study Recall</a>
+    <nav class="app-nav" aria-label="Main">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="topics.html">Topics</a>
+      <a href="study.html">Study</a>
+      <a href="planner.html">Planner</a>
+      <a href="progress.html">Progress</a>
+      <a href="profile.html">Profile</a>
+    </nav>
+    <button class="btn ghost small" type="button" data-signout>Sign out</button>
+  </header>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" class="app">
+    <section class="page-title">
+      <p class="eyebrow">Profile</p>
+      <h1 id="profileName" class="display">Your profile</h1>
+      <p class="page-lede">Your account, your totals, and your data.</p>
+    </section>
+    <p id="pageError" class="notice warn" role="alert" hidden></p>
+
+    <section class="section" aria-labelledby="accountTitle">
+      <div class="section-head"><h2 id="accountTitle" class="display">Account</h2></div>
+      <div class="panel profile-grid">
+        <dl class="kv"><dt>Name</dt><dd id="pName">—</dd></dl>
+        <dl class="kv"><dt>Email</dt><dd id="pEmail">—</dd></dl>
+        <dl class="kv"><dt>Member since</dt><dd id="pJoined">—</dd></dl>
+        <dl class="kv"><dt>Topics · sessions</dt><dd id="pTotals">—</dd></dl>
+      </div>
+      <p class="muted" style="margin-top:12px">Name changes are not available yet, because the backend has no endpoint for them.</p>
+    </section>
+
+    <section class="section" aria-labelledby="pwTitle">
+      <div class="section-head"><h2 id="pwTitle" class="display">Password</h2></div>
+      <form id="pwForm" class="panel form-grid">
+        <label>New password <span class="muted">(at least 8 characters)</span><input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+        <label>Confirm new password<input name="confirm" type="password" required minlength="8" autocomplete="new-password" /></label>
+        <div class="span-2 form-actions"><button class="btn primary" type="submit">Change password</button></div>
+      </form>
+    </section>
+
+    <section class="section" aria-labelledby="dataTitle">
+      <div class="section-head">
+        <h2 id="dataTitle" class="display">Your data</h2>
+        <span class="muted">Account data is stored on the server. Flashcards and focus minutes are stored in this browser.</span>
+      </div>
+      <div class="panel profile-grid">
+        <dl class="kv"><dt>Flashcards in this browser</dt><dd id="pCards">0</dd></dl>
+        <dl class="kv"><dt>Focus minutes saved in this browser</dt><dd id="pMinutes">0</dd></dl>
+      </div>
+      <div class="form-actions" style="margin-top:12px;justify-content:flex-start;flex-wrap:wrap">
+        <button id="exportBtn" class="btn primary" type="button">Export all my data (JSON)</button>
+        <button id="clearLocal" class="btn ghost danger" type="button">Clear browser-only data</button>
+      </div>
+    </section>
+  </main>
+  <footer class="foot"><p class="muted">Forecasts and recall figures are prototype estimates and are not calibrated.</p></footer>
+</body></html>

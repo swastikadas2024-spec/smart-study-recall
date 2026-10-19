@@ -1,0 +1,96 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · Planner</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/effects.js" defer></script>
+  <script src="js/planner.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="dashboard.html">Smart Study Recall</a>
+    <nav class="app-nav" aria-label="Main">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="topics.html">Topics</a>
+      <a href="study.html">Study</a>
+      <a href="planner.html">Planner</a>
+      <a href="progress.html">Progress</a>
+      <a href="profile.html">Profile</a>
+    </nav>
+    <button class="btn ghost small" type="button" data-signout>Sign out</button>
+  </header>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" class="app">
+    <section class="page-title">
+      <p class="eyebrow">Revision planner</p>
+      <h1 class="display">Plan your reviews</h1>
+      <p class="page-lede">Suggested review times, what is overdue, and a calendar you can export.</p>
+    </section>
+    <p id="pageError" class="notice warn" role="alert" hidden></p>
+
+    <div id="planner">
+      <section class="section" aria-labelledby="calTitleHead">
+        <div class="section-head">
+          <h2 id="calTitleHead" class="display">Calendar</h2>
+          <button id="exportIcs" class="btn small" type="button">Download calendar (.ics)</button>
+        </div>
+        <div class="panel">
+          <div class="cal-head">
+            <div class="form-actions" style="justify-content:flex-start">
+              <button id="calPrev" class="btn small" type="button" aria-label="Previous month">←</button>
+              <button id="calToday" class="btn small ghost" type="button">Today</button>
+              <button id="calNext" class="btn small" type="button" aria-label="Next month">→</button>
+            </div>
+            <h3 id="calTitle" class="cal-title"></h3>
+          </div>
+          <div id="calGrid" class="cal-grid" role="grid" aria-label="Revision calendar"></div>
+          <p class="muted" style="margin-top:12px">Dots: <span class="cal-dot now" style="display:inline-block"></span> overdue · <span class="cal-dot soon" style="display:inline-block"></span> pending · <span class="cal-dot done" style="display:inline-block"></span> completed</p>
+        </div>
+        <div class="panel" style="margin-top:6px">
+          <h3 id="calAgendaTitle" class="panel-title">Select a day</h3>
+          <ul id="calAgenda" class="rows"></ul>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="sugTitle">
+        <div class="section-head">
+          <h2 id="sugTitle" class="display">Suggested reviews</h2>
+          <span class="muted">Priority from your recorded accuracy and how recently you studied.</span>
+        </div>
+        <div class="panel"><ul id="suggestions" class="rows"></ul></div>
+      </section>
+
+      <section class="section" aria-labelledby="addRevTitle">
+        <div class="section-head"><h2 id="addRevTitle" class="display">Add a revision</h2></div>
+        <form id="revisionForm" class="panel form-grid">
+          <label>Topic<select name="topic_id" id="revTopic" required></select></label>
+          <label>When<input name="scheduled_at" id="revAt" type="datetime-local" required /></label>
+          <div class="span-2 form-actions"><button class="btn primary" type="submit">Schedule</button></div>
+        </form>
+      </section>
+
+      <section class="section" aria-labelledby="overdueTitle">
+        <div class="section-head"><h2 id="overdueTitle" class="display">Overdue <span id="overdueCount"></span></h2></div>
+        <div class="panel"><ul id="overdueList" class="rows"></ul></div>
+      </section>
+
+      <section class="section" aria-labelledby="upTitle">
+        <div class="section-head"><h2 id="upTitle" class="display">Upcoming <span id="upcomingCount"></span></h2></div>
+        <div class="panel"><ul id="upcomingList" class="rows"></ul></div>
+      </section>
+
+      <section class="section" aria-labelledby="doneTitle">
+        <div class="section-head">
+          <h2 id="doneTitle" class="display">Completed <span id="completedCount"></span></h2>
+          <span class="muted"><strong id="completionRate">—</strong> completion rate · <span id="completionDetail"></span></span>
+        </div>
+        <div class="panel"><ul id="completedList" class="rows"></ul></div>
+      </section>
+    </div>
+  </main>
+</body></html>
