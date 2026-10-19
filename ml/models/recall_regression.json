@@ -1,0 +1,13 @@
+{
+    "features": [
+        "log_history_seen",
+        "historical_accuracy",
+        "log_delta_days"
+    ],
+    "mae": 0.16708240518608372,
+    "rmse": 0.2628756970864794,
+    "model_type": "RandomForestRegressor",
+    "n_estimators": 150,
+    "max_depth": 8,
+    "min_samples_leaf": 20
+}

@@ -1,0 +1,44 @@
+{
+  "model_name": "GRU v2 learner-item sequence regressor",
+  "framework": "PyTorch",
+  "rows_loaded": 200000,
+  "valid_rows_after_filtering": 199998,
+  "sequence_count": 199998,
+  "sequence_length": 10,
+  "features": [
+    "log_history_seen",
+    "historical_accuracy",
+    "delta_days",
+    "log_delta_days"
+  ],
+  "target": "session_correct / session_seen",
+  "grouping": [
+    "user_id",
+    "lexeme_id"
+  ],
+  "tie_handling": "All rows from learner-item groups with repeated timestamps were excluded because their event order could not be determined.",
+  "split": "70/15/15 chronological by target timestamp",
+  "train_max_timestamp": 1362089396.0,
+  "validation_max_timestamp": 1362091036.0,
+  "best_epoch": 6,
+  "best_validation_mse": 0.07385113016086614,
+  "gru_v2_test": {
+    "mae": 0.17377473098784685,
+    "rmse": 0.27375591311839703
+  },
+  "mean_baseline_test": {
+    "mae": 0.17707342952638863,
+    "rmse": 0.2772900094835503
+  },
+  "rf1_test": {
+    "mae": 0.17248062070061398,
+    "rmse": 0.27112577609829347
+  },
+  "limitations": [
+    "Uses a 200,000-row dataset prefix, not the full dataset.",
+    "Chronological test split is not user-independent.",
+    "The target is observed session-level recall rate, not a validated future-retention probability.",
+    "Historical features come from source-provided aggregates.",
+    "A row-prefix sample may not represent the full dataset."
+  ]
+}
