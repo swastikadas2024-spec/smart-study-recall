@@ -53,6 +53,11 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    const currentPage = location.pathname.split("/").pop() || "index.html";
+    document.querySelectorAll(".app-nav a[href]").forEach((link) => {
+      const destination = new URL(link.href, location.href).pathname.split("/").pop();
+      if (destination === currentPage) link.setAttribute("aria-current", "page");
+    });
     if (!reduce && "IntersectionObserver" in window) {
       observer = new IntersectionObserver((entries) => {
         entries.forEach((en) => {

@@ -4,7 +4,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!S.requireLogin()) return;
   const $ = (id) => document.getElementById(id);
   const { esc, pct, parseTime } = S;
-  const M = window.SSR_MODEL;
   const L = window.SSR_LOCAL;
 
   // Each stat: label, numeric value for the count-up, display text, hint.
@@ -41,31 +40,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       statCard({ label: "Completed revisions", count: rs.completed, text: String(rs.completed), hint: `of ${rs.total} scheduled` }),
     ].join("");
 
-    // Forgetting forecast per topic, soonest first.
-    const rows = topics
-      .map((t) => {
-        const evs = events.filter((e) => e.topic_id === t.id);
-        return { t, f: M.forecast(evs) };
-      })
-      .filter((x) => x.f)
-      .sort((a, b) => a.f.dueIn - b.f.dueIn);
+    // The backend evaluates the trained model at proposed review intervals;
+    // review-date selection is a separate threshold policy.
+    const rows = recs.recommendations
+      .filter((r) => r.questions_seen > 0)
+      .map((r) => ({ t: topics.find((topic) => topic.id === r.topic_id), prediction: r.next_session_prediction }))
+      .filter((row) => row.t)
+      .sort((a, b) => (a.prediction?.recommended_review_in_days ?? Infinity) - (b.prediction?.recommended_review_in_days ?? Infinity));
 
-    const dueNow = rows.filter((x) => x.f.due).length;
-    $("dueNow").textContent = String(dueNow);
+    $("dueNow").textContent = String(rows.filter((row) => row.prediction?.available && row.prediction.recommended_review_in_days <= 2).length);
     $("todayMinutes").textContent = minutesToday >= 60
       ? `${Math.floor(minutesToday / 60)} h ${minutesToday % 60} min`
       : `${minutesToday} min`;
 
     $("forecastList").innerHTML = rows.length
-      ? rows.slice(0, 6).map(({ t, f }) => {
-          const when = f.due ? "Due now" : `Forget around ${f.dueAt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
-          const note = f.reliable ? "" : ` · beyond ${M.RELIABLE_DAYS} days, treat as rough`;
+      ? rows.slice(0, 6).map(({ t, prediction }) => {
+          if (!prediction?.available) {
+            return `<li class="row fx"><div><strong>${esc(t.topic_name)}</strong><span class="muted">${esc(prediction?.reason || "Next-session model unavailable.")}</span></div><span class="pill">Estimate unavailable</span></li>`;
+          }
           return `<li class="row fx">
-            <div><strong>${esc(t.topic_name)}</strong><span class="muted">${esc(when)}${esc(note)}</span></div>
-            <div class="row-actions"><span class="pill ${f.due ? "now" : f.recallNow < 0.8 ? "soon" : "later"}">${pct(f.recallNow * 100)} now</span></div>
+            <div><strong>${esc(t.topic_name)}</strong><span class="muted">Review in ${esc(prediction.recommended_review_in_days)} days · ${esc(prediction.model)}</span></div>
+            <div class="row-actions"><span class="pill ${prediction.recommended_predicted_score >= 0.8 ? "later" : "soon"}">${pct(prediction.recommended_predicted_score * 100)} expected score</span></div>
           </li>`;
         }).join("")
-      : `<li class="empty-line">Log questions for a topic to see its forecast.</li>`;
+      : `<li class="empty-line">Log questions for a topic to see next-session score scenarios.</li>`;
 
     // Questions per day, last 7 days (local calendar days).
     const days = [];

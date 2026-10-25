@@ -17,6 +17,7 @@
     <nav class="app-nav" aria-label="Main">
       <a href="dashboard.html">Dashboard</a>
       <a href="topics.html">Topics</a>
+      <a href="materials.html">Materials</a>
       <a href="study.html">Study</a>
       <a href="planner.html">Planner</a>
       <a href="progress.html">Progress</a>
@@ -51,21 +52,13 @@
 
     <section class="section" aria-labelledby="curveTitle">
       <div class="section-head">
-        <h2 id="curveTitle" class="display">Forgetting curve</h2>
-        <span class="tag estimate">Estimate</span>
+        <h2 id="curveTitle" class="display">Review interval scenarios</h2>
+        <span class="tag estimate">Experimental model</span>
       </div>
       <div class="panel">
-        <div class="form-grid" style="margin-bottom:20px">
-          <label>Topic<select id="curveTopic"></select></label>
-          <label>Look ahead<select id="curveDays">
-            <option value="14">14 days</option>
-            <option value="30" selected>30 days</option>
-            <option value="60">60 days</option>
-            <option value="120">120 days</option>
-          </select></label>
-        </div>
+        <label style="max-width:520px;margin-bottom:20px">Topic<select id="curveTopic"></select></label>
         <div id="curveOut"></div>
-        <p class="muted" style="margin-top:14px">Predicted recall falls as 2<sup>−t/H</sup>, where H is estimated from your recorded answers. The dashed line marks 80%. Prototype model, not calibrated. Beyond 60 days, treat it as a rough guide.</p>
+        <p class="muted" style="margin-top:14px">The model predicts the correct-answer fraction at a future session for each candidate gap. The separate policy chooses the latest interval predicted to meet an 80% score target. This is observational next-session prediction, not a measured memory probability or evidence that a particular schedule causes better learning.</p>
       </div>
     </section>
 

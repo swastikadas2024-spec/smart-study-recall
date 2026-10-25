@@ -2,16 +2,15 @@
 from datetime import datetime, timezone, timedelta
 import math
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_student, require_student_owner
-from app.config import settings
 from app.database import get_db
 from app.models import LearningEvent, Profile, RevisionSchedule, Topic
+from app.services.next_session import predict_review_scenarios
 
 router = APIRouter(
     prefix="/recommendations",
@@ -103,47 +102,13 @@ def get_revision_recommendations(
             latest_event_time = None
             days_since_study = None
 
-        # Experimental HLR prediction based on this topic's history.
-        hlr_prediction = {
+        # Conditional model predicts next-session score at proposed intervals;
+        # the review-date choice is a separate threshold policy.
+        next_session_prediction = predict_review_scenarios(valid_events) if valid_events else {
             "available": False,
             "experimental": True,
-            "reason": "No usable learning history for this topic.",
+            "reason": "Log at least one study session for this topic first.",
         }
-
-        if questions_seen > 0 and days_since_study is not None:
-            try:
-                response = httpx.post(
-                    f"{settings.ml_service_url.rstrip('/')}/predict/hlr",
-                    json={
-                        "history_seen": questions_seen,
-                        "history_correct": questions_correct,
-                        "elapsed_days": days_since_study,
-                    },
-                    timeout=10.0,
-                )
-                response.raise_for_status()
-
-                hlr_prediction = {
-                    "available": True,
-                    **response.json(),
-                }
-
-            except httpx.TimeoutException:
-                hlr_prediction = {
-                    "available": False,
-                    "experimental": True,
-                    "reason": "The HLR service timed out.",
-                }
-
-            except httpx.HTTPError:
-                hlr_prediction = {
-                    "available": False,
-                    "experimental": True,
-                    "reason": (
-                        "The HLR service is unavailable "
-                        "or returned an error."
-                    ),
-                }
 
         topic_schedules = [
             schedule for schedule in schedules
@@ -218,7 +183,7 @@ def get_revision_recommendations(
                 if priority == "medium"
                 else "Continue periodic revision."
             ),
-            "hlr_prediction": hlr_prediction,
+            "next_session_prediction": next_session_prediction,
         })
 
     priority_order = {"high": 0, "medium": 1, "low": 2}
@@ -319,7 +284,7 @@ def schedule_recommended_revision(
     )
 
     now = datetime.now(timezone.utc)
-    hlr_used = False
+    model_policy_used = False
     experimental = False
     interval_source = "rule_based_fallback"
 
@@ -337,55 +302,21 @@ def schedule_recommended_revision(
     else:
         interval_days = 7
 
-    # Use HLR only when the service returns a usable, finite interval.
+    # Predict the next-session score for candidate gaps, then apply the
+    # independent review-date policy (latest gap meeting the 80% target).
     if valid_events:
-        latest_time = valid_events[-1].event_time
-        if latest_time.tzinfo is None:
-            latest_time = latest_time.replace(tzinfo=timezone.utc)
-
-        elapsed_days = max(
-            0.0,
-            (now - latest_time).total_seconds() / 86400,
-        )
-
-        try:
-            response = httpx.post(
-                f"{settings.ml_service_url.rstrip('/')}/predict/hlr",
-                json={
-                    "history_seen": questions_seen,
-                    "history_correct": questions_correct,
-                    "elapsed_days": elapsed_days,
-                },
-                timeout=10.0,
-            )
-            response.raise_for_status()
-            prediction = response.json()
-
-            proposed_interval = float(
-                prediction["suggested_interval_days"]
-            )
-
-            if (
-                math.isfinite(proposed_interval)
-                and proposed_interval > 0
-            ):
-                # Operational safety cap; this does not validate the model.
-                interval_days = max(
-                    1,
-                    min(30, round(proposed_interval)),
-                )
-                hlr_used = True
-                experimental = True
-                interval_source = "experimental_hlr_capped"
-
-        except (
-            httpx.HTTPError,
-            ValueError,
-            TypeError,
-            KeyError,
+        scenarios = predict_review_scenarios(valid_events, now=now)
+        proposed_interval = (scenarios or {}).get("recommended_review_in_days")
+        if (
+            (scenarios or {}).get("available")
+            and isinstance(proposed_interval, (int, float))
+            and math.isfinite(proposed_interval)
+            and proposed_interval > 0
         ):
-            # Keep the rule-based fallback if HLR is unavailable or invalid.
-            pass
+            interval_days = float(proposed_interval)
+            model_policy_used = True
+            experimental = True
+            interval_source = "next_session_score_threshold_policy"
 
     scheduled_at = now + timedelta(days=interval_days)
 
@@ -412,18 +343,19 @@ def schedule_recommended_revision(
         "scheduled_at": revision.scheduled_at,
         "interval_days": interval_days,
         "interval_source": interval_source,
-        "hlr_used": hlr_used,
+        "hlr_used": False,
+        "next_session_model_policy_used": model_policy_used,
         "experimental": experimental,
-        "validated_for_student_topics": False if hlr_used else None,
+        "validated_for_student_topics": False if model_policy_used else None,
         "historical_accuracy_percent": (
             round(accuracy * 100, 2)
             if accuracy is not None
             else None
         ),
         "note": (
-            "HLR is experimental and capped for scheduling."
-            if hlr_used
-            else "A rule-based interval was used because no usable "
-                 "HLR interval was available."
+            "The model predicts next-session score conditional on a candidate gap; "
+            "a separate 80% threshold policy selected this interval."
+            if model_policy_used
+            else "The model was unavailable, so a conservative rule-based interval was used."
         ),
     }

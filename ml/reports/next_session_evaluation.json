@@ -1,0 +1,500 @@
+{
+  "task": "predict the next observed session correct/seen fraction, conditional on a specified gap from the current session",
+  "target": "next_session_correct / next_session_seen",
+  "features": [
+    "log_updated_seen",
+    "updated_accuracy",
+    "log_session_seen",
+    "session_accuracy",
+    "log_candidate_gap_days"
+  ],
+  "maximum_candidate_gap_days": 30.0,
+  "sequence_length": 10,
+  "source_dataset": "Duolingo Learning Traces; full source streamed, deterministic 1-in-N learner hash sample retained",
+  "learner_hash_sample_modulus": 100,
+  "learners": 617,
+  "eligible_examples_gap_at_most_30_days": 62931,
+  "total_examples_with_next_session": 62931,
+  "seeds": [
+    42,
+    52,
+    62
+  ],
+  "evaluation_protocols": {
+    "forward_time": "chronological 70/15/15 target-event split; estimates future events for the sampled population, with prior history available",
+    "learner_held_out": "70/15/15 disjoint learner IDs; estimates performance for unseen learners who provide their own interaction history at inference"
+  },
+  "split_sizes": {
+    "forward_time": {
+      "train_examples": 44051,
+      "validation_examples": 9440,
+      "test_examples": 9440,
+      "train_learners": 480,
+      "validation_learners": 188,
+      "test_learners": 194,
+      "learner_sets_disjoint": null
+    },
+    "learner_held_out": {
+      "train_examples": 46541,
+      "validation_examples": 8809,
+      "test_examples": 7581,
+      "train_learners": 433,
+      "validation_learners": 92,
+      "test_learners": 92,
+      "learner_sets_disjoint": true
+    }
+  },
+  "metrics": "MAE and RMSE for the continuous target; ECE with 10 equal-width bins; 95% percentile bootstrap intervals resampling learners as clusters (300 replicates) on ensemble-mean test predictions",
+  "validation_mae_by_model": {
+    "mean": 0.17909646829470655,
+    "hlr": 0.1304198151381283,
+    "linear_regression": 0.17249704152345657,
+    "random_forest": 0.17215355120543313,
+    "gru": 0.17185079387452748
+  },
+  "selected_champion": "hlr",
+  "selection_rule": "lowest mean validation MAE across both protocols; test metrics are not used to choose the deployed model",
+  "results": {
+    "forward_time": {
+      "mean": {
+        "validation_ensemble_mean": {
+          "mae": 0.17189578359662477,
+          "rmse": 0.2713465393437517,
+          "ece_10_equal_width": 0.0016997456550598145
+        },
+        "test_ensemble_mean": {
+          "mae": 0.1763021065932462,
+          "rmse": 0.2798057254539521,
+          "ece_10_equal_width": 0.0074239373207092285
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.16413909613310107,
+            0.1872781835553161
+          ],
+          "rmse": [
+            0.257655308708035,
+            0.2998943912365113
+          ],
+          "ece_10_equal_width": [
+            0.0005454833739568399,
+            0.021298603518556523
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.1763021065932462,
+            "rmse": 0.2798057254539521,
+            "ece_10_equal_width": 0.0074239373207092285
+          },
+          {
+            "mae": 0.1763021065932462,
+            "rmse": 0.2798057254539521,
+            "ece_10_equal_width": 0.0074239373207092285
+          },
+          {
+            "mae": 0.1763021065932462,
+            "rmse": 0.2798057254539521,
+            "ece_10_equal_width": 0.0074239373207092285
+          }
+        ]
+      },
+      "hlr": {
+        "validation_ensemble_mean": {
+          "mae": 0.1315786368270017,
+          "rmse": 0.28017118198946833,
+          "ece_10_equal_width": 0.06957339661238489
+        },
+        "test_ensemble_mean": {
+          "mae": 0.14035759155503882,
+          "rmse": 0.2926134147946841,
+          "ece_10_equal_width": 0.07816940011024794
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.12291032623555943,
+            0.15679163128899085
+          ],
+          "rmse": [
+            0.27144497881179913,
+            0.3107442494129071
+          ],
+          "ece_10_equal_width": [
+            0.06772513436834748,
+            0.09105298086778486
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.14035759155503888,
+            "rmse": 0.2926134147946841,
+            "ece_10_equal_width": 0.07816940011024794
+          },
+          {
+            "mae": 0.14035759155503888,
+            "rmse": 0.2926134147946841,
+            "ece_10_equal_width": 0.07816940011024794
+          },
+          {
+            "mae": 0.14035759155503888,
+            "rmse": 0.2926134147946841,
+            "ece_10_equal_width": 0.07816940011024794
+          }
+        ]
+      },
+      "linear_regression": {
+        "validation_ensemble_mean": {
+          "mae": 0.17012442648410797,
+          "rmse": 0.26504481287588466,
+          "ece_10_equal_width": 0.011588937599780197
+        },
+        "test_ensemble_mean": {
+          "mae": 0.17475487291812897,
+          "rmse": 0.2763411708488406,
+          "ece_10_equal_width": 0.013006015330300493
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.1601626550557068,
+            0.18890746876532394
+          ],
+          "rmse": [
+            0.2564161454351935,
+            0.2946255150901585
+          ],
+          "ece_10_equal_width": [
+            0.007108574234104552,
+            0.021382342846359825
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.17475487291812897,
+            "rmse": 0.2763411708488406,
+            "ece_10_equal_width": 0.013006015330300493
+          },
+          {
+            "mae": 0.17475487291812897,
+            "rmse": 0.2763411708488406,
+            "ece_10_equal_width": 0.013006015330300493
+          },
+          {
+            "mae": 0.17475487291812897,
+            "rmse": 0.2763411708488406,
+            "ece_10_equal_width": 0.013006015330300493
+          }
+        ]
+      },
+      "random_forest": {
+        "validation_ensemble_mean": {
+          "mae": 0.1693771576646828,
+          "rmse": 0.26513134213960693,
+          "ece_10_equal_width": 0.00881446375892921
+        },
+        "test_ensemble_mean": {
+          "mae": 0.17442001620202283,
+          "rmse": 0.27699659192635795,
+          "ece_10_equal_width": 0.015251076837550412
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.1590787255771318,
+            0.18874822735291272
+          ],
+          "rmse": [
+            0.25622587273925884,
+            0.29535537425691066
+          ],
+          "ece_10_equal_width": [
+            0.009521561461976066,
+            0.02189283590911242
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.17456031524022628,
+            "rmse": 0.27713943958053583,
+            "ece_10_equal_width": 0.01913876941318093
+          },
+          {
+            "mae": 0.17440499402639173,
+            "rmse": 0.27700294787525204,
+            "ece_10_equal_width": 0.015614260823323766
+          },
+          {
+            "mae": 0.17431757973981393,
+            "rmse": 0.27704301488375954,
+            "ece_10_equal_width": 0.016379134207158197
+          }
+        ]
+      },
+      "gru": {
+        "validation_ensemble_mean": {
+          "mae": 0.16669223390119728,
+          "rmse": 0.26287412715694214,
+          "ece_10_equal_width": 0.007069142807885448
+        },
+        "test_ensemble_mean": {
+          "mae": 0.1711406670437105,
+          "rmse": 0.2758348577423415,
+          "ece_10_equal_width": 0.009085012576674309
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.15554558929104428,
+            0.1857518600257642
+          ],
+          "rmse": [
+            0.2549442673145288,
+            0.2941171188565286
+          ],
+          "ece_10_equal_width": [
+            0.004302165223106589,
+            0.018763159171911258
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.17271803174546715,
+            "rmse": 0.27578978642110175,
+            "ece_10_equal_width": 0.007141503982119646
+          },
+          {
+            "mae": 0.17069191585089696,
+            "rmse": 0.27610511120947195,
+            "ece_10_equal_width": 0.011260024761244377
+          },
+          {
+            "mae": 0.17002784735128537,
+            "rmse": 0.27580639909623295,
+            "ece_10_equal_width": 0.01005001116102024
+          }
+        ]
+      }
+    },
+    "learner_held_out": {
+      "mean": {
+        "validation_ensemble_mean": {
+          "mae": 0.18629715299278832,
+          "rmse": 0.29595917007796213,
+          "ece_10_equal_width": 0.016608774662017822
+        },
+        "test_ensemble_mean": {
+          "mae": 0.16104988887259394,
+          "rmse": 0.25102755570683827,
+          "ece_10_equal_width": 0.016108274459838867
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.14458144600377515,
+            0.18340441279617936
+          ],
+          "rmse": [
+            0.21884678985357764,
+            0.2892267412120388
+          ],
+          "ece_10_equal_width": [
+            0.0011760201210110316,
+            0.037606050025474895
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.16104988887259394,
+            "rmse": 0.25102755570683827,
+            "ece_10_equal_width": 0.016108274459838867
+          },
+          {
+            "mae": 0.16104988887259394,
+            "rmse": 0.25102755570683827,
+            "ece_10_equal_width": 0.016108274459838867
+          },
+          {
+            "mae": 0.16104988887259394,
+            "rmse": 0.25102755570683827,
+            "ece_10_equal_width": 0.016108274459838867
+          }
+        ]
+      },
+      "hlr": {
+        "validation_ensemble_mean": {
+          "mae": 0.12926099344925493,
+          "rmse": 0.30358173453764425,
+          "ece_10_equal_width": 0.09007464466228547
+        },
+        "test_ensemble_mean": {
+          "mae": 0.1000693679834531,
+          "rmse": 0.2591358758926279,
+          "ece_10_equal_width": 0.06953059309948133
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.0780233390106441,
+            0.12841396881483091
+          ],
+          "rmse": [
+            0.22556456843750688,
+            0.29912748819533164
+          ],
+          "ece_10_equal_width": [
+            0.058553550482986674,
+            0.08636149033595444
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.1000693679834531,
+            "rmse": 0.25913587589262793,
+            "ece_10_equal_width": 0.06953059309948133
+          },
+          {
+            "mae": 0.1000693679834531,
+            "rmse": 0.25913587589262793,
+            "ece_10_equal_width": 0.06953059309948133
+          },
+          {
+            "mae": 0.1000693679834531,
+            "rmse": 0.25913587589262793,
+            "ece_10_equal_width": 0.06953059309948133
+          }
+        ]
+      },
+      "linear_regression": {
+        "validation_ensemble_mean": {
+          "mae": 0.17486965656280518,
+          "rmse": 0.2857039560958378,
+          "ece_10_equal_width": 0.018689620121340837
+        },
+        "test_ensemble_mean": {
+          "mae": 0.15138395130634308,
+          "rmse": 0.24771916525930954,
+          "ece_10_equal_width": 0.01027235834945429
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.13263125349794913,
+            0.17649065756525614
+          ],
+          "rmse": [
+            0.21697414848412128,
+            0.28357692781032895
+          ],
+          "ece_10_equal_width": [
+            0.004249594371461441,
+            0.024535977622824463
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.15138395130634308,
+            "rmse": 0.24771917277849004,
+            "ece_10_equal_width": 0.010272357461006215
+          },
+          {
+            "mae": 0.15138395130634308,
+            "rmse": 0.24771917277849004,
+            "ece_10_equal_width": 0.010272357461006215
+          },
+          {
+            "mae": 0.15138395130634308,
+            "rmse": 0.24771917277849004,
+            "ece_10_equal_width": 0.010272357461006215
+          }
+        ]
+      },
+      "random_forest": {
+        "validation_ensemble_mean": {
+          "mae": 0.17492994474618345,
+          "rmse": 0.2848858692670027,
+          "ece_10_equal_width": 0.015277613769691572
+        },
+        "test_ensemble_mean": {
+          "mae": 0.14706659033963682,
+          "rmse": 0.247739719844606,
+          "ece_10_equal_width": 0.008165380879389323
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.12744220528843309,
+            0.1733466741084086
+          ],
+          "rmse": [
+            0.21635030476367714,
+            0.2832781267284201
+          ],
+          "ece_10_equal_width": [
+            0.0038752758208965518,
+            0.01991843908911478
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.1470562989337917,
+            "rmse": 0.24768250056157562,
+            "ece_10_equal_width": 0.008355239286545173
+          },
+          {
+            "mae": 0.14706054599669602,
+            "rmse": 0.24794605374307097,
+            "ece_10_equal_width": 0.00593871007993148
+          },
+          {
+            "mae": 0.14708720894776212,
+            "rmse": 0.2477512691335547,
+            "ece_10_equal_width": 0.005374452121732083
+          }
+        ]
+      },
+      "gru": {
+        "validation_ensemble_mean": {
+          "mae": 0.17700935384785768,
+          "rmse": 0.2830291975359411,
+          "ece_10_equal_width": 0.011888262435202334
+        },
+        "test_ensemble_mean": {
+          "mae": 0.15296861018558158,
+          "rmse": 0.24743804020589108,
+          "ece_10_equal_width": 0.010470382748359614
+        },
+        "test_learner_cluster_bootstrap_95ci": {
+          "mae": [
+            0.13376255827720418,
+            0.17844647694005927
+          ],
+          "rmse": [
+            0.21630757855512417,
+            0.28328316368363377
+          ],
+          "ece_10_equal_width": [
+            0.0028749146810636054,
+            0.025104028516660746
+          ]
+        },
+        "test_per_seed": [
+          {
+            "mae": 0.152949348141219,
+            "rmse": 0.24739085930512922,
+            "ece_10_equal_width": 0.010467744096887555
+          },
+          {
+            "mae": 0.1524896827423074,
+            "rmse": 0.24745989563711474,
+            "ece_10_equal_width": 0.009953500782338047
+          },
+          {
+            "mae": 0.15346957606559158,
+            "rmse": 0.24775133847802489,
+            "ece_10_equal_width": 0.010686280859159882
+          }
+        ]
+      }
+    }
+  },
+  "caveats": [
+    "This target is a source dataset's next-session score, not a measured long-term memory probability.",
+    "The source is a language-learning task; transfer to course topics and material quizzes is unvalidated.",
+    "This is observational next-event prediction, not a causal estimate of the effect of changing review time.",
+    "A 1-in-100 learner sample reduces runtime; report its deterministic sampling method and repeat evaluation with other hash buckets before broad claims.",
+    "The schedule policy is a separate rule: choose the latest supported candidate gap whose predicted next-session score meets the chosen threshold; it is not trained as a schedule optimizer."
+  ]
+}

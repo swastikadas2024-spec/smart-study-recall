@@ -102,6 +102,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       ${f.reliable ? "" : `<p class="muted" style="margin-top:10px">This forecast reaches beyond ${M.RELIABLE_DAYS} days, which the model's own notes say is unreliable.</p>`}`;
   }
 
+  async function renderScenarios() {
+    const topicId = Number($("curveTopic").value);
+    if (!topicId) {
+      $("curveOut").innerHTML = `<p class="muted">Add a topic and log a study session to compare review intervals.</p>`;
+      return;
+    }
+    $("curveOut").innerHTML = `<p class="muted">Comparing candidate intervals…</p>`;
+    try {
+      $("curveOut").innerHTML = S.recallHTML(await S.api(`/topic-recall/${topicId}`));
+    } catch (error) {
+      $("curveOut").innerHTML = `<p class="muted">${esc(error.message)}</p>`;
+    }
+  }
+
   // Questions per week for the last 8 weeks (7-day windows ending today).
   function renderActivity() {
     const weeks = [];
@@ -162,8 +176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  $("curveTopic").addEventListener("change", renderCurve);
-  $("curveDays").addEventListener("change", renderCurve);
+  $("curveTopic").addEventListener("change", renderScenarios);
 
   try {
     const me = await S.currentStudent();
@@ -175,7 +188,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("curveTopic").innerHTML = topics.map((t) => `<option value="${t.id}">${esc(t.topic_name)}</option>`).join("");
     $("curveTopic").disabled = topics.length === 0;
     renderMeasured();
-    renderCurve();
+    renderScenarios();
     renderActivity();
     renderCompletion();
     renderEstimates();

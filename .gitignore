@@ -1,28 +1,18 @@
-<<<<<<< HEAD
-.env*
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Python environments and generated files
 .venv/
 .venv*/
 __pycache__/
 *.py[cod]
-
-smart-study-recall/
-=======
-.venv/
-__pycache__/
-*.pyc
 .ipynb_checkpoints/
+*.log
 
+# Local tooling and datasets
+.vscode/
 ml/data/raw/
 ml/data/processed/
-
-.vscode/
-.env
-
-# Python cache and local environment files
-.env
-backend/.env
-__pycache__/
-*.pyc
-# Large raw dataset
-ml/data/raw/
->>>>>>> e527473d5567a7db81420627238d661fd7051980

@@ -11,20 +11,22 @@ The project has three services that run together during development.
 | Service | Folder | Port | Purpose |
 |---------|--------|------|---------|
 | Frontend | `frontend/` | 5500 | Website: dashboard, topics, study timer, quiz, planner, progress, profile |
-| Backend | `backend/` | 8001 | FastAPI API: topics, study sessions, quiz results, revision schedules |
-| ML service | `ml/` | 8000 | Recall models: forgetting forecast, GRU and random-forest estimates |
+| Backend | `app/` | 8002 | FastAPI API: student records, faculty materials, RAG study tools, schedules |
+| ML service | `ml/` | 8000 | Candidate-gap next-session score model and baselines |
 
 Accounts are handled by **Supabase Auth**. Application data is stored in **PostgreSQL** on Supabase.
 
 ## Features
 
 - Sign up, log in and reset your password.
-- Dashboard with key figures, a forgetting forecast for each topic, today's focus time and weekly activity.
+- Dashboard with key figures, next-session score scenarios, today's focus time and weekly activity.
 - Topics with subjects, flashcards, study sessions and recall checks.
+- Faculty study library with source-cited notes, quizzes, and a material chatbot.
+- Recall Compass, which uses a student's past quiz misses to prioritize related source passages and quiz concepts.
 - Focus timer in stopwatch, Pomodoro and countdown modes.
 - Quiz generated from your flashcards, with results saved to your history.
 - Planner with a revision calendar, suggested reviews, scheduling and `.ics` export.
-- Progress with measured results, a forgetting curve per topic and model estimates.
+- Progress with measured results, candidate review intervals and experimental model estimates.
 - Profile with account details, password change and full data export.
 
 ## Project structure
@@ -32,27 +34,25 @@ Accounts are handled by **Supabase Auth**. Application data is stored in **Postg
 ```text
 smart-study-recall/
 ├── README.md
+├── .env.example              Backend and optional AI provider settings
+├── app/                      Authenticated FastAPI backend
+│   ├── main.py               App setup, CORS and route registration
+│   ├── models.py             PostgreSQL models
+│   ├── routers/              Student, topic, schedule and material APIs
+│   └── services/             RAG extraction, retrieval and generation
+├── migrations/               SQL migrations for Supabase
 ├── frontend/                 Static website (HTML, CSS, JavaScript, no build step)
 │   ├── index.html            Sign up, log in, reset password
 │   ├── dashboard.html        Overview and forecast
 │   ├── topics.html           Topics, sessions, flashcards
+│   ├── materials.html        Faculty library and AI study workspace
 │   ├── study.html            Focus timer and quiz
 │   ├── planner.html          Revision calendar
 │   ├── progress.html         Results and forgetting curves
 │   ├── profile.html          Account and data export
 │   ├── css/app.css
 │   └── js/                   config.js, api.js, model.js, local.js, effects.js, page scripts
-├── backend/                  FastAPI application
-│   ├── app/
-│   │   ├── main.py           App setup, CORS, routes, health checks
-│   │   ├── config.py         Settings read from backend/.env
-│   │   ├── database.py       Database connection
-│   │   ├── models.py         Database tables
-│   │   ├── auth.py           Checks Supabase sign-in tokens
-│   │   └── routers/          One file per feature area
-│   ├── migrations/           SQL to run in Supabase
-│   ├── requirements.txt
-│   └── .env.example
+├── backend/                  Legacy API files kept for existing deployments
 └── ml/
     ├── models/               Saved models and parameters
     └── src/
@@ -71,20 +71,23 @@ smart-study-recall/
 
 ### 1. Set up the database
 
-1. In Supabase, open **SQL Editor** and run the files in `backend/migrations/` in order, starting with `002_topic_subject_and_reschedule.sql`.
-2. Copy the connection string from **Project Settings → Database** (URI format). URL-encode any special characters in the password.
+1. In Supabase, open **SQL Editor** and run `migrations/002_topic_subject_and_reschedule.sql`, then `migrations/003_ai_study_materials.sql`.
+2. Any signed-in user can upload materials; no faculty role change is needed. Published materials appear in the shared library for all signed-in users. Unpublished materials remain visible only to their uploader.
+3. Copy the connection string from **Project Settings → Database** (URI format). URL-encode any special characters in the password.
 
-### 2. Start the backend (port 8001)
+Supabase Auth and the configured database are still required; the backend stores extracted passages and generated study data in that database.
+
+### 2. Start the backend (port 8002)
 
 ```powershell
-cd backend
+cd smart-study-recall
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Open `backend/.env` and fill in your values:
+Open `.env` and fill in your values:
 
 ```env
 DATABASE_URL=postgresql+psycopg2://postgres.YOUR_PROJECT_REF:YOUR_PASSWORD@YOUR_POOLER_HOST:5432/postgres
@@ -92,26 +95,41 @@ SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 SUPABASE_ANON_KEY=YOUR_ANON_PUBLIC_KEY
 ML_SERVICE_URL=http://127.0.0.1:8000
 FRONTEND_ORIGINS=http://127.0.0.1:5500,http://localhost:5500
+AI_API_KEY=YOUR_GEMINI_API_KEY
+AI_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+AI_MODEL=gemini-3.8-flash
 ```
 
 Start the server:
 
 ```powershell
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --host 127.0.0.1 --port 8002
 ```
 
-Check it at `http://127.0.0.1:8001/health`. Interactive API docs are at `http://127.0.0.1:8001/docs`.
+Check it at `http://127.0.0.1:8002/health`. Interactive API docs are at `http://127.0.0.1:8002/docs`.
 
-### 3. Start the ML service (port 8000, optional)
+The AI key and model are optional. Without them, uploaded materials still support extractive notes, source passage retrieval, and extractive chat. With OpenAI configured, the app uses the Responses API. Gemini is also supported through Google's OpenAI-compatible Chat Completions endpoint; set `AI_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai` and choose an available Gemini text model. Keep the key in the repository-root `.env`; never put it in frontend JavaScript. Retrieved excerpts are sent to the configured AI provider.
 
-The recall estimates on the Progress page come from this service. The rest of the app works without it.
+Faculty can upload PDF, DOCX, TXT, and Markdown files up to 12 MB. Scanned PDFs need OCR before upload. The RAG responses include source excerpts; verify important details against the original material.
+
+### 3. Train and start the ML service (port 8000)
+
+Place the Duolingo Learning Traces file at `ml/data/raw/settles.acl16.learning_traces.13m.csv.gz`. Train and evaluate the next-session model from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe ml/src/train_next_session_model.py
+```
+
+The training job streams the full dataset and retains a deterministic 1-in-100 sample of learners by default. It compares a mean baseline, fitted HLR, linear regression, Random Forest, and GRU on the same forward-time and learner-held-out splits, across three seeds. It writes the evaluation, learner-cluster confidence intervals, calibration summaries, split sizes, and validation-selected deployment model to `ml/reports/next_session_evaluation.json`. Increase coverage with `--user-sample-modulus 20` if the machine has enough memory and training time.
+
+Start the service in a separate terminal:
 
 ```powershell
 cd ml\src
-python -m uvicorn api:app --port 8000
+..\..\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
 ```
 
-Check it at `http://127.0.0.1:8000/health`.
+Check it at `http://127.0.0.1:8000/health`. The health response indicates whether the trained champion artifact is available. If the ML service is down or no artifact exists, the app uses a clearly labelled conservative schedule fallback.
 
 ### 4. Start the frontend (port 5500)
 
@@ -121,7 +139,7 @@ Open `frontend/js/config.js` and set your values:
 window.APP_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT_REF.supabase.co",
   SUPABASE_ANON_KEY: "YOUR_ANON_PUBLIC_KEY",
-  API_URL: "http://127.0.0.1:8001"
+  API_URL: "http://127.0.0.1:8002"
 };
 ```
 
@@ -131,7 +149,7 @@ Then:
 2. Right-click `index.html` and choose **Open with Live Server**.
 3. The site opens at `http://127.0.0.1:5500/index.html`.
 
-Keep three things running while you work: the backend, the ML service (optional) and Live Server.
+Keep three things running while you work: the backend, the trained ML service and Live Server.
 
 > Use only the **anon (public)** key in the frontend. Never put the `service_role` key in this project.
 
@@ -148,21 +166,18 @@ Every endpoint except `/`, `/health` and `/health/database` needs a Supabase sig
 | Recommendations | `GET /recommendations/{student_id}`, `POST /recommendations/{student_id}/schedule` |
 | Dashboard | `GET /dashboard/{student_id}` |
 | Topic recall | `GET /topic-recall/{id}` (needs the ML service) |
+| AI study materials | `GET/POST /materials`, `POST /materials/{id}/notes`, `/quiz`, `/chat` |
 | Health | `GET /`, `GET /health`, `GET /health/database` |
 
 The older predictions routes are not mounted. They did not check who was signed in, so anyone could read another student's history. Enable them only after authentication checks are added.
 
-## How the forecast works
+## Prediction task and review policy
 
-The forgetting forecast is calculated in the browser using the saved half-life model in `ml/models/hlr_parameters.json`.
+The prediction task is narrowly defined: **given a learner's ordered study events through the current session and a proposed gap of at most 30 days, predict the next session's correct-answer fraction** (`next_session_correct / next_session_seen`). The predictor does not choose a review date.
 
-- Half-life: `H = exp(θ₁ · log(1 + n) + θ₂ · accuracy)`, where `n` is the number of questions seen and `accuracy` is the share answered correctly.
-- Recall after `t` days: `p = 2^(−t / H)`.
-- A topic is due when recall falls to 80%, which happens after `H · log₂(1/0.8)` days.
+The app evaluates a fixed set of candidate delays. A separate policy selects the latest candidate whose predicted next-session score is at least 80%; if none meets the threshold, it chooses the earliest candidate. This policy is experimental and is not evidence that the chosen interval causes better retention.
 
-Forecasts beyond 60 days are flagged as rough guides. Study time does not change the model. Recall checks and quiz results do.
-
-The GRU model (`recall_gru_v3.pt`) gives a recall estimate for the current session. Its output does not fall smoothly over time, so it is not used to set forgetting dates.
+`ml/reports/next_session_evaluation.json` records the sampled population, test metrics, 95% learner-cluster bootstrap intervals, calibration error, model comparisons, and validation-selected champion. The public-trace task is a proxy: it predicts a language-learning session score, not course-concept memory. Do not describe it as a validated forgetting probability. See `docs/learner-pilot-protocol.md` for the consented adaptive-versus-fixed learner pilot needed to assess transfer and learning outcomes.
 
 ## Data storage
 
@@ -177,15 +192,15 @@ The GRU model (`recall_gru_v3.pt`) gives a recall estimate for the current sessi
 | Problem | Fix |
 |---------|-----|
 | `Could not import module "main"` | Use `uvicorn app.main:app` from inside the `backend` folder. |
-| "Cannot reach the backend" banner | Check that the backend runs on port 8001 and the site opens on port 5500. Close any other Live Server window. |
+| "Cannot reach the backend" banner | Check that the backend runs on port 8002 and the site opens on port 5500. Close any other Live Server window. |
 | Browser shows a CORS error | Add the page's address to `FRONTEND_ORIGINS` in `backend/.env` and restart the backend. |
 | Progress page says the estimate is unavailable | Start the ML service on port 8000. |
 | Sign-in shows a configuration message | `frontend/js/config.js` still has placeholder values. |
-| Database connection error | Check `DATABASE_URL` and URL-encode the password. Test at `http://127.0.0.1:8001/health/database`. |
+| Database connection error | Check `DATABASE_URL` and URL-encode the password. Test at `http://127.0.0.1:8002/health/database`. |
 
 ## Security
 
-- Keep `backend/.env` out of Git. The `.gitignore` should list it.
+- Keep `.env` out of Git. Never commit an AI provider key.
 - The frontend uses only the Supabase anon key. The database URL belongs only in `backend/.env`.
 - Never commit a `service_role` key, a database password or an access token.
 

@@ -4,7 +4,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!S.requireLogin()) return;
   const $ = (id) => document.getElementById(id);
   const { esc, pct } = S;
-  const M = window.SSR_MODEL;
   const L = window.SSR_LOCAL;
   const val = (form, name) => form.querySelector(`[name="${name}"]`).value;
   let me = null;
@@ -19,17 +18,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function forecastLine(topicId) {
-    const f = M.forecast(events.filter((e) => e.topic_id === topicId));
-    if (!f) return `<div class="forecast-line"><span class="muted">No forecast yet. Log questions for this topic.</span></div>`;
-    const when = f.due
-      ? "<strong>Due now</strong>"
-      : `Forget around <strong>${esc(f.dueAt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }))}</strong>`;
-    const note = f.reliable ? "" : `<span class="muted">Beyond ${M.RELIABLE_DAYS} days: treat as a rough guide.</span>`;
-    return `<div class="forecast-line">
-      <span class="tag estimate">Estimate</span>
-      <span>Recall now <strong>${pct(f.recallNow * 100)}</strong> · ${when}</span>
-      ${note}
-    </div>`;
+    return `<div class="forecast-line" id="topicForecast-${topicId}" aria-live="polite"><span class="muted">Checking next-session score scenarios…</span></div>`;
+  }
+
+  function scenarioMarkup(result) {
+    if (!result.available) return `<span class="muted">${esc(result.reason)}</span>`;
+    const options = (result.scenarios || []).map((scenario) => `
+      <li class="row"><span>Review in ${esc(scenario.review_in_days)} day${Number(scenario.review_in_days) === 1 ? "" : "s"}</span>
+      <strong>${pct(Number(scenario.predicted_next_session_recall) * 100)}</strong></li>`).join("");
+    return `<span class="tag estimate">Next-session score · experimental</span>
+      <strong>Review in ${esc(result.recommended_review_in_days)} days</strong>
+      <span>Expected next-session score ${pct(Number(result.recommended_predicted_score) * 100)}</span>
+      ${options ? `<details><summary>Compare candidate intervals</summary><ul class="rows scenario-list">${options}</ul></details>` : ""}
+      <span class="muted">This is not a long-term memory probability.</span>`;
+  }
+
+  async function refreshPredictions() {
+    await Promise.all(topics.map(async (topic) => {
+      const target = document.getElementById(`topicForecast-${topic.id}`);
+      if (!target) return;
+      try {
+        target.innerHTML = scenarioMarkup(await S.api(`/topic-recall/${topic.id}`));
+      } catch (error) {
+        target.innerHTML = `<span class="muted">${esc(error.message)}</span>`;
+      }
+    }));
   }
 
   function render() {
@@ -77,6 +90,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     select.disabled = !hasTopics;
     $("sessionForm").querySelector("button[type=submit]").disabled = !hasTopics;
     window.SSR_FX.animateCounts();
+    void refreshPredictions();
   }
 
   async function load() {

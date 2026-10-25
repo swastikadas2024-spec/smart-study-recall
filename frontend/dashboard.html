@@ -18,6 +18,7 @@
     <nav class="app-nav" aria-label="Main">
       <a href="dashboard.html">Dashboard</a>
       <a href="topics.html">Topics</a>
+      <a href="materials.html">Materials</a>
       <a href="study.html">Study</a>
       <a href="planner.html">Planner</a>
       <a href="progress.html">Progress</a>
@@ -35,6 +36,21 @@
     </section>
     <p id="pageError" class="notice warn" role="alert" hidden></p>
 
+    <nav class="quick-actions" aria-label="Quick study actions">
+      <a class="quick-action" href="study.html">
+        <div><strong>Start a focus session</strong><span>Choose a topic and start your timer</span></div>
+        <span class="quick-arrow" aria-hidden="true">↗</span>
+      </a>
+      <a class="quick-action" href="materials.html">
+        <div><strong>Ask your study materials</strong><span>Review cited notes or chat with a source</span></div>
+        <span class="quick-arrow" aria-hidden="true">↗</span>
+      </a>
+      <a class="quick-action" href="planner.html">
+        <div><strong>Plan your next review</strong><span>See what is due and schedule a session</span></div>
+        <span class="quick-arrow" aria-hidden="true">↗</span>
+      </a>
+    </nav>
+
     <section class="section" aria-labelledby="statsTitle">
       <h2 id="statsTitle" class="sr-only">Totals</h2>
       <div id="statGrid" class="stat-grid"></div>
@@ -43,17 +59,17 @@
     <section class="section two-col">
       <div class="panel">
         <div class="panel-head">
-          <h2 class="panel-title">Forgetting forecast</h2>
-          <span class="tag estimate">Estimate</span>
+          <h2 class="panel-title">Next-session score by review interval</h2>
+          <span class="tag estimate">Experimental model</span>
         </div>
-        <p class="muted" style="margin-bottom:14px">When each topic is predicted to fall to 80% recall, from your recorded answers and the days since you last studied it. Prototype model, not calibrated.</p>
+        <p class="muted" style="margin-bottom:14px">Predicted correct-answer fraction at the next session for the review interval selected by the 80% policy. This is not a long-term memory probability.</p>
         <ul id="forecastList" class="rows"></ul>
       </div>
       <div class="panel">
         <h2 class="panel-title">Today</h2>
         <div class="profile-grid">
           <div class="kv"><dt>Focus time today</dt><dd id="todayMinutes">0 min</dd></div>
-          <div class="kv"><dt>Topics due for recall</dt><dd id="dueNow">0</dd></div>
+          <div class="kv"><dt>Topics for early review</dt><dd id="dueNow">0</dd></div>
         </div>
         <p class="muted" style="margin-top:14px">Focus time is timed in this browser. <a href="study.html">Start a focus session</a> or <a href="study.html#quiz">generate a quiz</a>.</p>
       </div>

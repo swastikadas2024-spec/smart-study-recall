@@ -156,17 +156,18 @@
     }
 
     let res;
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
     try {
       res = await fetch(cfg.API_URL + path, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
-          ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+          ...(body !== undefined && !isFormData ? { "Content-Type": "application/json" } : {}),
         },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
       });
     } catch (e) {
-      throw new ApiError(0, `Cannot reach the backend at ${cfg.API_URL}. Is it running on port 8001?`);
+      throw new ApiError(0, `Cannot reach the backend at ${cfg.API_URL}. Is it running on the configured API port?`);
     }
 
     if (res.status === 401) {
@@ -251,11 +252,19 @@
   // Result of GET /topic-recall/{id}. Always labelled as experimental.
   function recallHTML(r) {
     if (!r.available) return `<p class="muted">${esc(r.reason)}</p>`;
-    const rate = r.prediction && r.prediction.predicted_session_recall_rate;
+    const rate = r.recommended_predicted_score ?? r.prediction?.predicted_next_session_recall;
+    const scenarios = (r.scenarios || []).map((scenario) => `
+      <li class="row">
+        <div><strong>Review in ${esc(scenario.review_in_days)} day${Number(scenario.review_in_days) === 1 ? "" : "s"}</strong>
+          <span class="muted">${esc(scenario.candidate_gap_days)} days since last session</span></div>
+        <span class="pill">${pct(Number(scenario.predicted_next_session_recall) * 100)} expected score</span>
+      </li>`).join("");
     return `<div class="estimate">
-      <span class="stat-label">Model estimate · experimental</span>
+      <span class="stat-label">Next-session score · experimental</span>
       <p class="estimate-value">${rate === undefined || rate === null ? "n/a" : pct(rate * 100)}</p>
-      <p class="muted">Based on your recorded accuracy of ${pct(r.accuracy_percent)} over ${esc(r.questions_seen)} questions, ${esc(r.elapsed_days)} days after your latest session. RF-1 model, not calibrated. This is not a measured recall result.</p>
+      <p class="muted">For a review in ${esc(r.recommended_review_in_days)} day${Number(r.recommended_review_in_days) === 1 ? "" : "s"}, the model predicts this fraction correct at the next session. It uses ${esc(r.questions_seen)} questions of history. ${esc(r.model)} · not calibrated · not a long-term memory probability.</p>
+      <p class="muted">Review-date rule: ${esc(r.policy)}</p>
+      ${scenarios ? `<ul class="rows" aria-label="Candidate review scenarios">${scenarios}</ul>` : ""}
     </div>`;
   }
 

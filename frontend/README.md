@@ -24,11 +24,11 @@ Supabase project and to the FastAPI backend. The backend is not changed by this 
    window.APP_CONFIG = {
      SUPABASE_URL: "https://YOUR-PROJECT-REF.supabase.co",
      SUPABASE_ANON_KEY: "YOUR-ANON-PUBLIC-KEY",   // the anon/public key only, never service_role
-     API_URL: "http://127.0.0.1:8001"
+     API_URL: "http://127.0.0.1:8002"
    };
    ```
-4. Start your FastAPI backend on port 8001 the way you already do (for example
-   `uvicorn <your-main-module>:app --reload --port 8001`). Its `FRONTEND_ORIGINS` setting must
+4. Start your FastAPI backend on port 8002 the way you already do (for example
+   `uvicorn <your-main-module>:app --host 127.0.0.1 --port 8002`). Its `FRONTEND_ORIGINS` setting must
    include `http://127.0.0.1:5500`, which is the default.
 5. Right-click `index.html` and choose **Open with Live Server**. The site opens at
    `http://127.0.0.1:5500/index.html`.

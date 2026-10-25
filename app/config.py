@@ -15,6 +15,9 @@ class Settings(BaseSettings):
 
     supabase_url: str = ""
     supabase_anon_key: str = ""
+    ai_api_key: str = ""
+    ai_api_base_url: str = "https://api.openai.com/v1"
+    ai_model: str = ""
 
     # Comma-separated list of origins allowed to call this API from a browser.
     frontend_origins: str = "http://127.0.0.1:5500,http://localhost:5500"

@@ -1,0 +1,67 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · Materials</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/materials.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="dashboard.html">Smart Study Recall</a>
+    <nav class="app-nav" aria-label="Main">
+      <a href="dashboard.html">Dashboard</a><a href="topics.html">Topics</a>
+      <a href="materials.html" aria-current="page">Materials</a><a href="study.html">Study</a>
+      <a href="planner.html">Planner</a><a href="progress.html">Progress</a><a href="profile.html">Profile</a>
+    </nav>
+    <button class="btn ghost small" type="button" data-signout>Sign out</button>
+  </header>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" class="app">
+    <section class="page-title">
+      <p class="eyebrow">RAG study library</p>
+      <h1 class="display">Materials</h1>
+      <p class="page-lede">Upload a study source, then create cited notes, quizzes, and a chatbot grounded in its passages.</p>
+    </section>
+    <p id="pageError" class="notice warn" role="alert" hidden></p>
+    <p id="providerNotice" class="notice" hidden></p>
+
+    <section id="facultyUpload" class="section" aria-labelledby="uploadTitle">
+      <div class="section-head"><h2 id="uploadTitle" class="display">Upload material</h2></div>
+      <form id="uploadForm" class="panel form-grid">
+        <label>Material title<input name="title" required maxlength="200" placeholder="e.g. Cell signalling lecture 4" /></label>
+        <label>Subject<input name="subject" maxlength="100" placeholder="Biology" /></label>
+        <label class="span-2">Study material <span class="muted">PDF, DOCX, TXT or Markdown · up to 12 MB</span><input name="file" type="file" accept=".pdf,.docx,.txt,.md,application/pdf" required /></label>
+        <label class="check-line span-2"><input name="published" type="checkbox" checked /> Share with all signed-in users</label>
+        <div class="span-2 form-actions"><button id="uploadButton" class="btn primary" type="submit">Upload and index material</button></div>
+      </form>
+    </section>
+
+    <section class="section" aria-labelledby="libraryTitle">
+      <div class="section-head"><h2 id="libraryTitle" class="display">Study library</h2><span id="materialCount" class="muted"></span></div>
+      <div id="materialList" class="material-grid"></div>
+      <p id="emptyMaterials" class="empty" hidden>No shared materials yet. Upload one above to start studying.</p>
+    </section>
+
+    <section id="studyWorkspace" class="section" hidden aria-labelledby="workspaceTitle">
+      <div class="section-head"><div><p class="eyebrow">Evidence workspace</p><h2 id="workspaceTitle" class="display"></h2></div><span class="tag estimate">Source-grounded</span></div>
+      <div class="panel workspace-tools">
+        <div><h3>Recall Compass</h3><p class="muted">As you take quizzes, the retriever raises source passages for concepts you miss and explains the evidence it used.</p><p class="muted">When AI is configured, retrieved excerpts are sent to the selected AI provider.</p></div>
+        <div class="topic-actions"><button id="makeNotes" class="btn primary" type="button">Create notes</button><button id="makeQuiz" class="btn" type="button">Generate quiz</button></div>
+      </div>
+      <p id="workspaceStatus" class="muted" aria-live="polite"></p>
+      <div id="notesOutput" class="material-output" hidden></div>
+      <div id="quizOutput" class="material-output" hidden></div>
+      <div class="panel chat-panel">
+        <div class="panel-head"><h3 class="panel-title">Material chatbot</h3><span class="muted">RAG answers cite source excerpts</span></div>
+        <div id="chatMessages" class="chat-messages" aria-live="polite"><p class="muted">Choose a material, then ask a question about it.</p></div>
+        <form id="chatForm" class="chat-form"><label class="sr-only" for="chatQuestion">Ask the material chatbot</label><input id="chatQuestion" name="question" required maxlength="1000" placeholder="Ask a question about this uploaded material…" /><button class="btn primary" type="submit">Ask</button></form>
+      </div>
+    </section>
+  </main>
+  <footer class="foot"><p>Answers and study assets are generated from uploaded course sources and include citations. Verify important details against the original material.</p></footer>
+</body></html>

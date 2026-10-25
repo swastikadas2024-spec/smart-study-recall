@@ -1,23 +1,13 @@
-from datetime import datetime, timezone
-
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_student
-from app.config import settings
 from app.database import get_db
 from app.models import LearningEvent, Profile, Topic
+from app.services.next_session import predict_review_scenarios
 
 router = APIRouter(prefix="/topic-recall", tags=["Topic Recall"])
-
-
-def _aware(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
-
 
 @router.get("/{topic_id}")
 def get_topic_recall(
@@ -37,7 +27,7 @@ def get_topic_recall(
     base = {
         "topic_id": topic.id,
         "topic_name": topic.topic_name,
-        "model": "RF-1",
+        "model": "next-session champion",
         "experimental": True,
         "calibrated": False,
     }
@@ -61,44 +51,22 @@ def get_topic_recall(
 
     seen = sum(event.questions_seen for event in events)
     correct = sum(event.questions_correct for event in events)
-    latest = _aware(events[-1].event_time)
-    elapsed = max(
-        (datetime.now(timezone.utc) - latest).total_seconds() / 86400,
-        1 / 86400,
-    )
-
-    try:
-        response = httpx.post(
-            f"{settings.ml_service_url.rstrip('/')}/predict",
-            json={
-                "history_seen": seen,
-                "history_correct": correct,
-                "elapsed_days": elapsed,
-            },
-            timeout=15.0,
-        )
-        response.raise_for_status()
-        prediction = response.json()
-
-    except httpx.TimeoutException:
-        return {**base, "available": False, "reason": "The ML service timed out."}
-
-    except (httpx.HTTPError, ValueError):
-        return {
-            **base,
-            "available": False,
-            "reason": (
-                "The ML service is not running or returned an error. "
-                "Start it on port 8000."
-            ),
-        }
+    scenarios = predict_review_scenarios(events)
+    if scenarios is None:
+        return {**base, "available": False, "reason": "Log at least one study session for this topic first."}
+    if not scenarios.get("available"):
+        return {**base, **scenarios, "questions_seen": seen, "questions_correct": correct}
 
     return {
         **base,
-        "available": True,
+        **scenarios,
         "questions_seen": seen,
         "questions_correct": correct,
         "accuracy_percent": round(correct / seen * 100, 2),
-        "elapsed_days": round(elapsed, 2),
-        "prediction": prediction,
+        "prediction": {
+            "predicted_next_session_recall": scenarios["recommended_predicted_score"],
+            "predicted_session_recall_rate": scenarios["recommended_predicted_score"],
+            "target_type": "next-session correct/seen fraction",
+            "model": scenarios["model"],
+        },
     }

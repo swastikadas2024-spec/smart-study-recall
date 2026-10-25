@@ -23,6 +23,7 @@ class StudentResponse(BaseModel):
     id: int
     student_name: str
     email: str | None
+    role: str
     created_at: object
 
 

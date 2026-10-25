@@ -7,6 +7,7 @@ from app.config import settings
 from app.database import SessionLocal
 from app.routers.dashboard import router as dashboard_router
 from app.routers.learning_events import router as learning_events_router
+from app.routers.materials import router as materials_router
 from app.routers.recommendations import router as recommendations_router
 from app.routers.revision_schedules import router as revision_schedules_router
 from app.routers.students import router as students_router
@@ -29,6 +30,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_private_network=True,
 )
 
 app.include_router(students_router)
@@ -38,6 +40,7 @@ app.include_router(revision_schedules_router)
 app.include_router(recommendations_router)
 app.include_router(dashboard_router)
 app.include_router(topic_recall_router)
+app.include_router(materials_router)
 
 
 @app.get("/")

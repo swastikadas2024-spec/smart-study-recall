@@ -154,7 +154,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     $("suggestions").innerHTML = recs.recommendations.length
       ? recs.recommendations.map((r) => `<li class="row">
-          <div><strong>${esc(r.topic_name)}</strong><span class="muted">${esc(r.reason)} ${esc(r.suggested_action)}</span></div>
+          <div><strong>${esc(r.topic_name)}</strong><span class="muted">${esc(r.reason)} ${esc(r.suggested_action)}</span>
+            ${r.next_session_prediction?.available
+              ? `<span class="muted">Model policy: review in ${esc(r.next_session_prediction.recommended_review_in_days)} days · expected next-session score ${S.pct(r.next_session_prediction.recommended_predicted_score * 100)}</span>`
+              : `<span class="muted">${esc(r.next_session_prediction?.reason || "Rule-based schedule will be used if the model is unavailable.")}</span>`}</div>
           <div class="row-actions">
             <span class="pill ${priorityClass(r.priority)}">${esc(r.priority)}</span>
             <button class="btn small primary" type="button" data-action="schedule" data-topic="${r.topic_id}">Schedule review</button>
