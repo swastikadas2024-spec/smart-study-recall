@@ -3,13 +3,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/app.css?v=manual-study-hours-1" />
   <script src="js/config.js"></script>
   <script src="js/api.js" defer></script>
   <script src="js/model.js" defer></script>
   <script src="js/local.js" defer></script>
   <script src="js/effects.js" defer></script>
-  <script src="js/study.js" defer></script>
+  <script src="js/study.js?v=manual-study-hours-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -20,6 +20,7 @@
       <a href="topics.html">Topics</a>
       <a href="materials.html">Materials</a>
       <a href="study.html">Study</a>
+      <a href="chatbot.html">RAG Chatbot</a>
       <a href="planner.html">Planner</a>
       <a href="progress.html">Progress</a>
       <a href="profile.html">Profile</a>
@@ -32,7 +33,7 @@
     <section class="page-title">
       <p class="eyebrow">Study</p>
       <h1 class="display">Focus and recall</h1>
-      <p class="page-lede">Time a session against a topic, then test yourself from the flashcards you wrote.</p>
+      <p class="page-lede">Use the countdown while you study, or log hours afterward. Quiz results update your topic recall data.</p>
     </section>
     <p id="pageError" class="notice warn" role="alert" hidden></p>
 
@@ -78,6 +79,27 @@
           <h3 class="panel-title" style="margin-top:26px">Last 7 days by topic</h3>
           <ul id="weekList" class="rows"></ul>
         </div>
+      </div>
+
+      <div class="panel manual-study-panel" aria-labelledby="manualStudyTitle">
+        <div class="panel-head">
+          <div>
+            <h3 class="panel-title" id="manualStudyTitle">Log study hours</h3>
+            <p class="muted">Enter time you studied without using the timer.</p>
+          </div>
+        </div>
+        <form id="manualStudyForm" class="form-grid manual-study-form">
+          <label>Topic
+            <select id="manualStudyTopic" required></select>
+          </label>
+          <label>Hours studied
+            <input id="manualStudyHours" type="number" min="0.01" max="24" step="0.01" placeholder="e.g. 1.5" required />
+          </label>
+          <div class="form-actions manual-study-action">
+            <button id="manualStudySave" class="btn primary" type="submit">Save study time</button>
+          </div>
+        </form>
+        <p class="muted manual-study-note">Time entries update your focus-time totals in this browser. To update recall forecasts, also record quiz answers in the Recall quiz below.</p>
       </div>
     </section>
 

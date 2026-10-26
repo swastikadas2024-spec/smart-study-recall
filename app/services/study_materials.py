@@ -9,6 +9,7 @@ import math
 import random
 import re
 import time
+from datetime import datetime, timezone
 from collections import Counter
 from typing import Any
 
@@ -108,6 +109,35 @@ def concept_gaps(db: Session, student_id: int, material_id: int) -> dict[str, fl
         concept: max(0.0, 0.8 - correct / total) * min(total / 3, 1.0)
         for concept, (correct, total) in counts.items()
         if total >= 2 and correct / total < 0.8
+    }
+
+
+def concept_recency_priority(db: Session, student_id: int, material_id: int) -> dict[str, float]:
+    """Expose elapsed quiz time as a bounded review-priority heuristic.
+
+    This is not a predicted forgetting probability. It is zero at the latest
+    quiz and reaches one at 30 or more days without a newer quiz response.
+    """
+    rows = db.scalars(
+        select(StudyQuizResponse).where(
+            StudyQuizResponse.student_id == student_id,
+            StudyQuizResponse.material_id == material_id,
+        )
+    ).all()
+    latest: dict[str, datetime] = {}
+    for row in rows:
+        concept = row.concept.strip().lower()
+        timestamp = row.created_at
+        if timestamp is None:
+            continue
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        if concept not in latest or timestamp > latest[concept]:
+            latest[concept] = timestamp
+    now = datetime.now(timezone.utc)
+    return {
+        concept: min(1.0, max(0.0, (now - timestamp).total_seconds() / 86400 / 30))
+        for concept, timestamp in latest.items()
     }
 
 

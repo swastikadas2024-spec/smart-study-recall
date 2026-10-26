@@ -14,6 +14,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `<div class="stat fx"><span class="stat-label">${esc(label)}</span>${value}<span class="stat-hint">${esc(hint)}</span></div>`;
   }
 
+  function curveSVG(points, topicName, targetScore = 0.8, elapsedDays = 0) {
+    if (!Array.isArray(points) || points.length < 2) return "";
+    const width = 360, height = 92, left = 9, right = 7, top = 8, bottom = 18;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const x = (day) => left + (Math.max(0, Math.min(30, Number(day) || 0)) / 30) * plotWidth;
+    const y = (score) => top + (1 - Math.max(0, Math.min(1, Number(score) || 0)) ) * plotHeight;
+    const path = points.map((point, index) => `${index ? "L" : "M"}${x(point.day_since_last_session).toFixed(1)},${y(point.predicted_next_session_recall).toFixed(1)}`).join(" ");
+    const targetY = y(targetScore);
+    const todayX = x(elapsedDays);
+    return `<svg class="forgetting-curve" viewBox="0 0 ${width} ${height}" role="img" aria-label="Estimated recall decay curve for ${esc(topicName)}">
+      <title>Estimated next-session score after the last study session</title>
+      <line x1="${left}" y1="${targetY.toFixed(1)}" x2="${width - right}" y2="${targetY.toFixed(1)}" class="curve-target" />
+      <line x1="${todayX.toFixed(1)}" y1="${top}" x2="${todayX.toFixed(1)}" y2="${height - bottom}" class="curve-today" />
+      <path d="${path}" class="curve-path" />
+      <text x="${left}" y="${height - 3}">0d</text><text x="${width - right}" y="${height - 3}" text-anchor="end">30d</text>
+      <text x="${width - right - 2}" y="${Math.max(10, targetY - 3).toFixed(1)}" text-anchor="end">80% target</text>
+    </svg>`;
+  }
+
+  function reminderLabel(prediction) {
+    if (prediction.forgetting_forecast_status === "threshold_already_crossed") {
+      return { text: "Review now", tone: "now", detail: prediction.predicted_forgetting_at
+        ? `Estimated threshold date passed ${Math.ceil(prediction.days_past_predicted_forgetting || 0)} day(s) ago`
+        : "The model estimates recall is already below the 80% target" };
+    }
+    if (prediction.forgetting_forecast_status === "below_threshold_at_first_sample") {
+      return { text: "Review now", tone: "now", detail: "The first supported forecast point is already below the 80% target" };
+    }
+    if (prediction.predicted_forgetting_at) {
+      const date = parseTime(prediction.predicted_forgetting_at);
+      const when = date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+      const remaining = Number(prediction.days_until_predicted_forgetting) || 0;
+      const wait = remaining < 1 ? "within a day" : `in about ${Math.ceil(remaining)} days`;
+      return { text: `Review by ${when}`, tone: remaining <= 2 ? "soon" : "later", detail: `Estimated to cross below 80% ${wait}` };
+    }
+    return { text: "Beyond 30-day horizon", tone: "later", detail: "The estimate stays at or above 80% through the model horizon" };
+  }
+
   try {
     const me = await S.currentStudent();
     $("greeting").textContent = `Hello, ${me.student_name}.`;
@@ -44,26 +83,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     // review-date selection is a separate threshold policy.
     const rows = recs.recommendations
       .filter((r) => r.questions_seen > 0)
-      .map((r) => ({ t: topics.find((topic) => topic.id === r.topic_id), prediction: r.next_session_prediction }))
+      .map((r) => ({
+        t: topics.find((topic) => topic.id === r.topic_id),
+        recommendation: r,
+        prediction: r.next_session_prediction,
+      }))
       .filter((row) => row.t)
-      .sort((a, b) => (a.prediction?.recommended_review_in_days ?? Infinity) - (b.prediction?.recommended_review_in_days ?? Infinity));
+      .sort((a, b) => {
+        const aDays = a.prediction?.days_until_predicted_forgetting;
+        const bDays = b.prediction?.days_until_predicted_forgetting;
+        const aRank = a.prediction?.forgetting_forecast_status === "threshold_already_crossed" ? -1 : aDays ?? Infinity;
+        const bRank = b.prediction?.forgetting_forecast_status === "threshold_already_crossed" ? -1 : bDays ?? Infinity;
+        return aRank - bRank;
+      });
 
-    $("dueNow").textContent = String(rows.filter((row) => row.prediction?.available && row.prediction.recommended_review_in_days <= 2).length);
+    $("dueNow").textContent = String(rows.filter((row) => row.prediction?.available && (
+      row.prediction.forgetting_forecast_status === "threshold_already_crossed" ||
+      row.prediction.forgetting_forecast_status === "below_threshold_at_first_sample" ||
+      (row.prediction.days_until_predicted_forgetting !== null && row.prediction.days_until_predicted_forgetting <= 2)
+    )).length);
     $("todayMinutes").textContent = minutesToday >= 60
       ? `${Math.floor(minutesToday / 60)} h ${minutesToday % 60} min`
       : `${minutesToday} min`;
 
     $("forecastList").innerHTML = rows.length
-      ? rows.slice(0, 6).map(({ t, prediction }) => {
+      ? rows.map(({ t, recommendation, prediction }) => {
           if (!prediction?.available) {
-            return `<li class="row fx"><div><strong>${esc(t.topic_name)}</strong><span class="muted">${esc(prediction?.reason || "Next-session model unavailable.")}</span></div><span class="pill">Estimate unavailable</span></li>`;
+            return `<li class="forgetting-row fx"><div><strong>${esc(t.topic_name)}</strong><span class="muted">${esc(prediction?.reason || "Next-session model unavailable.")}</span></div><span class="pill">Forecast unavailable</span></li>`;
           }
+          const reminder = reminderLabel(prediction);
+          const currentScore = prediction.current_predicted_score;
           return `<li class="row fx">
-            <div><strong>${esc(t.topic_name)}</strong><span class="muted">Review in ${esc(prediction.recommended_review_in_days)} days · ${esc(prediction.model)}</span></div>
-            <div class="row-actions"><span class="pill ${prediction.recommended_predicted_score >= 0.8 ? "later" : "soon"}">${pct(prediction.recommended_predicted_score * 100)} expected score</span></div>
+            <div class="forgetting-topic">
+              <div class="forgetting-heading">
+                <div><strong>${esc(t.topic_name)}</strong><span class="muted">${esc(recommendation.questions_seen)} questions studied · ${esc(prediction.model)} forecast</span></div>
+                <span class="pill ${reminder.tone}">${esc(reminder.text)}</span>
+              </div>
+              ${curveSVG(prediction.forgetting_curve, t.topic_name, prediction.target_score, prediction.elapsed_since_last_session_days)}
+              <div class="forgetting-footer"><span class="muted">${esc(reminder.detail)}</span><span class="muted">${currentScore === null || currentScore === undefined ? "Current estimate unavailable" : `${pct(currentScore * 100)} estimated now`}</span></div>
+            </div>
           </li>`;
         }).join("")
-      : `<li class="empty-line">Log questions for a topic to see next-session score scenarios.</li>`;
+      : `<li class="empty-line">Log a study session for a topic to see its forgetting curve and review-by reminder.</li>`;
 
     // Questions per day, last 7 days (local calendar days).
     const days = [];

@@ -1,6 +1,6 @@
 """Application adapter for the ML service's conditional next-session score."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -10,6 +10,7 @@ from app.config import settings
 REVIEW_DELAY_CANDIDATES = [0.25, 1, 2, 3, 5, 7, 10, 14, 21, 30]
 TARGET_NEXT_SESSION_SCORE = 0.80
 MAX_TRAINED_GAP_DAYS = 30.0
+FORGETTING_CURVE_GAPS = [0.01, 0.05, 0.1, 0.25, 0.5, *range(1, 31)]
 
 
 def predict_review_scenarios(events, *, now: datetime | None = None) -> dict | None:
@@ -67,7 +68,13 @@ def predict_review_scenarios(events, *, now: datetime | None = None) -> dict | N
             "experimental": True,
         }
 
-    candidate_gaps = [elapsed + delay for delay in delays]
+    # Evaluate the learned recall curve across the full supported horizon,
+    # independently of which future review dates the policy may choose.
+    # Include policy candidates and today's elapsed point in the same request.
+    curve_gaps = set(float(gap) for gap in FORGETTING_CURVE_GAPS)
+    curve_gaps.add(max(elapsed, 0.01))
+    policy_gaps = {round(elapsed + delay, 4): delay for delay in delays}
+    candidate_gaps = sorted(curve_gaps | set(policy_gaps))
     try:
         response = httpx.post(
             f"{settings.ml_service_url.rstrip('/')}/predict/next-session/scenarios",
@@ -85,7 +92,22 @@ def predict_review_scenarios(events, *, now: datetime | None = None) -> dict | N
         }
 
     predictions = result.get("predictions") or []
-    if len(predictions) != len(delays):
+    by_gap = {
+        round(float(prediction.get("candidate_gap_days")), 4): prediction
+        for prediction in predictions
+    }
+    scenarios = []
+    for requested_gap, delay in policy_gaps.items():
+        prediction = by_gap.get(requested_gap)
+        if prediction is None:
+            continue
+        scenarios.append({
+            "review_in_days": delay,
+            "candidate_gap_days": prediction.get("candidate_gap_days"),
+            "predicted_next_session_recall": prediction.get("predicted_next_session_recall"),
+            "model": prediction.get("model"),
+        })
+    if len(scenarios) != len(delays):
         return {
             "available": False,
             "reason": "The model returned an incomplete set of review scenarios.",
@@ -93,14 +115,58 @@ def predict_review_scenarios(events, *, now: datetime | None = None) -> dict | N
             "experimental": True,
         }
 
-    scenarios = []
-    for delay, prediction in zip(delays, predictions):
-        scenarios.append({
-            "review_in_days": delay,
-            "candidate_gap_days": prediction.get("candidate_gap_days"),
+    curve = []
+    for gap in sorted(curve_gaps):
+        prediction = by_gap.get(round(gap, 4))
+        if prediction is None:
+            continue
+        curve.append({
+            "day_since_last_session": gap,
+            "days_from_now": round(gap - elapsed, 4),
             "predicted_next_session_recall": prediction.get("predicted_next_session_recall"),
-            "model": prediction.get("model"),
         })
+
+    # Define the displayed "forgetting date" as the estimated first time the
+    # next-session score falls below the app's explicit 80% review threshold.
+    # This is a model-derived review deadline, not an observed memory event.
+    crossing_gap = None
+    crossing_status = "beyond_model_horizon"
+    for point in curve:
+        score = point["predicted_next_session_recall"]
+        if isinstance(score, (int, float)) and score < TARGET_NEXT_SESSION_SCORE:
+            crossing_gap = point["day_since_last_session"]
+            crossing_status = "below_threshold_at_first_sample"
+            break
+    for left, right in zip(curve, curve[1:]):
+        left_score = left["predicted_next_session_recall"]
+        right_score = right["predicted_next_session_recall"]
+        if (
+            isinstance(left_score, (int, float))
+            and isinstance(right_score, (int, float))
+            and left_score >= TARGET_NEXT_SESSION_SCORE
+            and right_score < TARGET_NEXT_SESSION_SCORE
+        ):
+            fraction = (left_score - TARGET_NEXT_SESSION_SCORE) / (left_score - right_score)
+            crossing_gap = left["day_since_last_session"] + fraction * (
+                right["day_since_last_session"] - left["day_since_last_session"]
+            )
+            crossing_status = (
+                "threshold_already_crossed" if crossing_gap <= elapsed else "upcoming_threshold_crossing"
+            )
+            break
+
+    predicted_forgetting_at = None
+    days_until_forgetting = None
+    overdue_days = None
+    if crossing_gap is not None:
+        predicted_forgetting_at = (latest + timedelta(days=crossing_gap)).isoformat()
+        days_until_forgetting = max(0.0, crossing_gap - elapsed)
+        overdue_days = max(0.0, elapsed - crossing_gap)
+        if crossing_status == "below_threshold_at_first_sample" and crossing_gap <= elapsed:
+            crossing_status = "threshold_already_crossed"
+
+    current_gap = min(max(elapsed, 0.01), MAX_TRAINED_GAP_DAYS)
+    current_prediction = by_gap.get(round(current_gap, 4))
     meeting_target = [
         scenario for scenario in scenarios
         if isinstance(scenario["predicted_next_session_recall"], (int, float))
@@ -115,6 +181,13 @@ def predict_review_scenarios(events, *, now: datetime | None = None) -> dict | N
         "target_type": "next-session correct/seen fraction",
         "target_score": TARGET_NEXT_SESSION_SCORE,
         "elapsed_since_last_session_days": round(elapsed, 3),
+        "predicted_forgetting_at": predicted_forgetting_at,
+        "predicted_forgetting_gap_days": round(crossing_gap, 3) if crossing_gap is not None else None,
+        "days_until_predicted_forgetting": round(days_until_forgetting, 3) if days_until_forgetting is not None else None,
+        "days_past_predicted_forgetting": round(overdue_days, 3) if overdue_days is not None else None,
+        "forgetting_forecast_status": crossing_status,
+        "current_predicted_score": current_prediction.get("predicted_next_session_recall") if current_prediction else None,
+        "forgetting_curve": curve,
         "recommended_review_in_days": selected["review_in_days"],
         "recommended_candidate_gap_days": selected["candidate_gap_days"],
         "recommended_predicted_score": selected["predicted_next_session_recall"],

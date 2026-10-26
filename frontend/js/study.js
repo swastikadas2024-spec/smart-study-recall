@@ -384,6 +384,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("countdownMinutes").addEventListener("change", () => {
     if (!timer.running && timer.studiedMs === 0) resetTimer();
   });
+  $("manualStudyForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const topicId = Number($("manualStudyTopic").value);
+    const topic = topics.find((item) => item.id === topicId);
+    const hours = Number($("manualStudyHours").value);
+    if (!topic || !Number.isFinite(hours) || hours <= 0 || hours > 24) {
+      S.toast("Choose a topic and enter between 0.01 and 24 hours.", "error");
+      return;
+    }
+    const minutes = Math.max(1, Math.round(hours * 60));
+    try {
+      L.addStudy(me.id, {
+        topic_id: topic.id,
+        topic_name: topic.topic_name,
+        minutes,
+        mode: "manual entry",
+      });
+      $("manualStudyHours").value = "";
+      S.toast(`Logged ${hours} hour${hours === 1 ? "" : "s"} for ${topic.topic_name}.`);
+      renderLog();
+    } catch (err) {
+      S.toast(err.message || "Could not save study time.", "error");
+    }
+  });
 
   try {
     me = await S.currentStudent();
@@ -391,8 +415,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       S.api("/topics"),
       S.api(`/learning-events?student_id=${me.id}`),
     ]);
-    $("studyTopic").innerHTML = topics.map((t) => `<option value="${t.id}">${esc(t.topic_name)}</option>`).join("");
+    const topicOptions = topics.map((t) => `<option value="${t.id}">${esc(t.topic_name)}</option>`).join("");
+    $("studyTopic").innerHTML = topicOptions;
+    $("manualStudyTopic").innerHTML = topicOptions;
     $("studyTopic").disabled = topics.length === 0;
+    $("manualStudyTopic").disabled = topics.length === 0;
+    $("manualStudySave").disabled = topics.length === 0;
     $("quizHint").hidden = topics.some((t) => L.cards(me.id)[String(t.id)]);
     resetTimer();
     renderLog();

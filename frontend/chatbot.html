@@ -1,0 +1,179 @@
+<!doctype html><html lang="en"><head>
+  <title>Smart Study Recall · RAG Chatbot</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Chat with uploaded study materials using standard, hybrid, or recall-aware retrieval." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css?v=recall-aware-rag-1" />
+  <link rel="stylesheet" href="css/rag-chatbot.css?v=recall-aware-rag-1" />
+  <script src="js/config.js"></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/rag-chatbot.js?v=recall-aware-rag-1" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="dashboard.html">Smart Study Recall</a>
+    <nav class="app-nav" aria-label="Main">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="topics.html">Topics</a>
+      <a href="materials.html">Materials</a>
+      <a href="study.html">Study</a>
+      <a href="chatbot.html" aria-current="page">RAG Chatbot</a>
+      <a href="planner.html">Planner</a>
+      <a href="progress.html">Progress</a>
+      <a href="profile.html">Profile</a>
+    </nav>
+    <button class="btn ghost small" type="button" data-signout>Sign out</button>
+  </header>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" class="app">
+    <section class="page-title">
+      <p class="eyebrow">Hybrid RAG study assistant</p>
+      <h1 class="display">RAG Chatbot</h1>
+      <p class="page-lede">Chat with your study materials using AI-powered retrieval. Switch between standard keyword search and hybrid RAG for smarter answers.</p>
+    </section>
+    <p id="pageError" class="notice warn" role="alert" hidden></p>
+
+    <!-- Material selection + RAG mode toggle -->
+    <section class="section" aria-labelledby="setupTitle">
+      <div class="section-head">
+        <h2 id="setupTitle" class="display">Setup</h2>
+      </div>
+      <div class="panel rag-setup-panel">
+        <div class="rag-setup-grid">
+          <div class="rag-setup-field">
+            <label for="materialSelect">Study Material</label>
+            <select id="materialSelect">
+              <option value="">— Choose a material —</option>
+            </select>
+          </div>
+          <div class="rag-setup-field">
+            <label>RAG Mode</label>
+            <div class="rag-mode-switch" role="radiogroup" aria-label="RAG retrieval mode">
+              <button class="rag-mode-btn" data-mode="standard" type="button" role="radio" aria-checked="false">
+                <span class="rag-mode-icon">🔍</span>
+                <span class="rag-mode-label">Standard RAG</span>
+                <span class="rag-mode-desc">BM25 keyword search</span>
+              </button>
+              <button class="rag-mode-btn is-active" data-mode="hybrid" type="button" role="radio" aria-checked="true">
+                <span class="rag-mode-icon">⚡</span>
+                <span class="rag-mode-label">Hybrid RAG</span>
+                <span class="rag-mode-desc">BM25 + Semantic + RRF</span>
+              </button>
+              <button class="rag-mode-btn" data-mode="adaptive" type="button" role="radio" aria-checked="false">
+                <span class="rag-mode-icon">🎯</span>
+                <span class="rag-mode-label">Recall-aware</span>
+                <span class="rag-mode-desc">Hybrid retrieval + your quiz gaps and review recency</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="materialInfo" class="rag-material-info" hidden>
+          <span id="materialChunks" class="tag"></span>
+          <span id="materialGaps" class="tag"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RAG Architecture Visualisation -->
+    <section class="section" id="architectureSection" aria-labelledby="archTitle" hidden>
+      <div class="section-head">
+        <h2 id="archTitle" class="display">RAG Architecture</h2>
+        <button id="toggleArch" class="btn small ghost" type="button">Show pipeline</button>
+      </div>
+      <div id="architecturePanel" class="panel rag-arch-panel" hidden>
+        <div class="rag-arch-header">
+          <h3 id="archModeName"></h3>
+          <span id="archModeTag" class="tag estimate"></span>
+        </div>
+        <div id="pipelineFlow" class="rag-pipeline-flow"></div>
+        <div id="retrievalDetails" class="rag-retrieval-details"></div>
+        <div id="archComparison" class="rag-comparison"></div>
+      </div>
+    </section>
+
+    <!-- Chat interface -->
+    <section class="section" id="chatSection" aria-labelledby="chatTitle" hidden>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Source-grounded answers</p>
+          <h2 id="chatTitle" class="display">Chat</h2>
+        </div>
+        <div class="rag-chat-controls">
+          <span id="ragModeIndicator" class="tag estimate"></span>
+          <button id="showDiagnostics" class="btn small ghost" type="button">Show retrieval scores</button>
+        </div>
+      </div>
+      <div class="panel rag-chat-panel">
+        <div id="chatMessages" class="rag-chat-messages" aria-live="polite">
+          <div class="rag-chat-welcome">
+            <div class="rag-welcome-icon">🤖</div>
+            <h3>Ready to help you study</h3>
+            <p>Ask any question about your selected study material. I'll find the most relevant passages and provide cited answers.</p>
+            <div class="rag-welcome-suggestions" id="suggestions">
+              <button class="rag-suggestion" type="button" data-q="Summarize the key concepts">Summarize key concepts</button>
+              <button class="rag-suggestion" type="button" data-q="What are the main topics covered?">Main topics covered</button>
+              <button class="rag-suggestion" type="button" data-q="Explain the most important ideas">Important ideas</button>
+            </div>
+          </div>
+        </div>
+        <form id="chatForm" class="rag-chat-form">
+          <label class="sr-only" for="chatInput">Ask the RAG chatbot</label>
+          <input id="chatInput" name="question" required maxlength="1000" placeholder="Ask about your study material…" autocomplete="off" />
+          <button id="chatSend" class="btn primary" type="submit" aria-label="Send message">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Quiz + Notes tools -->
+    <section class="section" id="toolsSection" aria-labelledby="toolsTitle" hidden>
+      <div class="section-head">
+        <h2 id="toolsTitle" class="display">Study tools</h2>
+        <span class="muted">Powered by <span id="toolsRagMode"></span> RAG</span>
+      </div>
+      <div class="rag-tools-grid">
+        <div class="panel rag-tool-card">
+          <div class="rag-tool-icon">📝</div>
+          <h3>Generate Notes</h3>
+          <p class="muted">Create cited study notes extracted from the material using the selected RAG mode.</p>
+          <button id="makeRagNotes" class="btn primary" type="button">Create notes</button>
+          <div id="ragNotesOutput" hidden></div>
+        </div>
+        <div class="panel rag-tool-card">
+          <div class="rag-tool-icon">🧪</div>
+          <h3>Generate Quiz</h3>
+          <p class="muted">Test your knowledge with questions generated from retrieved material passages.</p>
+          <div class="rag-quiz-setup">
+            <label>Questions
+              <select id="ragQuizCount">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="8">8</option>
+                <option value="10">10</option>
+              </select>
+            </label>
+            <button id="makeRagQuiz" class="btn primary" type="button">Generate quiz</button>
+          </div>
+          <div id="ragQuizOutput" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Diagnostics panel -->
+    <section class="section" id="diagnosticsSection" aria-labelledby="diagTitle" hidden>
+      <div class="section-head">
+        <h2 id="diagTitle" class="display">Retrieval diagnostics</h2>
+        <button id="closeDiagnostics" class="btn small ghost" type="button">Hide</button>
+      </div>
+      <div id="diagnosticsContent" class="panel"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Answers are generated from uploaded study materials and include source citations. Verify important details against the original material. RAG architecture is visible above — toggle between standard keyword and hybrid semantic+keyword retrieval.</p>
+  </footer>
+</body></html>

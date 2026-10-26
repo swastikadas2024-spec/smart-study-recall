@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,9 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_api_base_url: str = "https://api.openai.com/v1"
     ai_model: str = ""
+    rag_state_gap_weight: float = Field(default=0.30, ge=0.0, le=1.0)
+    rag_state_recency_weight: float = Field(default=0.15, ge=0.0, le=1.0)
+    rag_direct_question_state_scale: float = Field(default=0.25, ge=0.0, le=1.0)
 
     # Comma-separated list of origins allowed to call this API from a browser.
     frontend_origins: str = "http://127.0.0.1:5500,http://localhost:5500"

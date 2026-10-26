@@ -8,6 +8,7 @@ from app.database import SessionLocal
 from app.routers.dashboard import router as dashboard_router
 from app.routers.learning_events import router as learning_events_router
 from app.routers.materials import router as materials_router
+from app.routers.rag_chatbot import router as rag_chatbot_router
 from app.routers.recommendations import router as recommendations_router
 from app.routers.revision_schedules import router as revision_schedules_router
 from app.routers.students import router as students_router
@@ -41,6 +42,7 @@ app.include_router(recommendations_router)
 app.include_router(dashboard_router)
 app.include_router(topic_recall_router)
 app.include_router(materials_router)
+app.include_router(rag_chatbot_router)
 
 
 @app.get("/")

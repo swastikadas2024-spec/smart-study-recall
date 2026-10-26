@@ -22,8 +22,9 @@ Accounts are handled by **Supabase Auth**. Application data is stored in **Postg
 - Dashboard with key figures, next-session score scenarios, today's focus time and weekly activity.
 - Topics with subjects, flashcards, study sessions and recall checks.
 - Faculty study library with source-cited notes, quizzes, and a material chatbot.
-- Recall Compass, which uses a student's past quiz misses to prioritize related source passages and quiz concepts.
-- Focus timer in stopwatch, Pomodoro and countdown modes.
+- Recall Compass, which uses repeated material-quiz misses to prioritize related source passages and quiz concepts.
+- RAG chatbot with standard BM25, unpersonalized BM25 + TF-IDF hybrid, and an experimental recall-aware mode based on observed quiz gaps and exposure recency.
+- Focus timer in stopwatch, Pomodoro and countdown modes, plus manual study-hour logging. Focus duration is browser-local and is not a recall label.
 - Quiz generated from your flashcards, with results saved to your history.
 - Planner with a revision calendar, suggested reviews, scheduling and `.ics` export.
 - Progress with measured results, candidate review intervals and experimental model estimates.
@@ -39,7 +40,8 @@ smart-study-recall/
 │   ├── main.py               App setup, CORS and route registration
 │   ├── models.py             PostgreSQL models
 │   ├── routers/              Student, topic, schedule and material APIs
-│   └── services/             RAG extraction, retrieval and generation
+│   ├── services/             RAG extraction, retrieval and generation
+│   └── tests/                Hermetic app/RAG unit tests
 ├── migrations/               SQL migrations for Supabase
 ├── frontend/                 Static website (HTML, CSS, JavaScript, no build step)
 │   ├── index.html            Sign up, log in, reset password
@@ -57,7 +59,9 @@ smart-study-recall/
     ├── models/               Saved models and parameters
     └── src/
         ├── api.py            ML web service
-        └── hlr_recommendation_service.py
+        ├── next_session_model.py  HLR/GRU next-session score contract
+        ├── knowledge_tracing.py   LSTM and Transformer sequence candidates
+        └── train_knowledge_tracer.py
 ```
 
 ## Getting started
@@ -155,7 +159,7 @@ Keep three things running while you work: the backend, the trained ML service an
 
 ## API reference
 
-Every endpoint except `/`, `/health` and `/health/database` needs a Supabase sign-in token in the `Authorization: Bearer` header. The backend checks the token and returns only the signed-in student's data.
+Every application endpoint except `/`, `/health`, `/health/database` and the static `GET /rag/architecture` metadata route needs a Supabase sign-in token in the `Authorization: Bearer` header. The backend checks the token and returns only the signed-in student's data.
 
 | Area | Endpoints |
 |------|-----------|
@@ -167,9 +171,12 @@ Every endpoint except `/`, `/health` and `/health/database` needs a Supabase sig
 | Dashboard | `GET /dashboard/{student_id}` |
 | Topic recall | `GET /topic-recall/{id}` (needs the ML service) |
 | AI study materials | `GET/POST /materials`, `POST /materials/{id}/notes`, `/quiz`, `/chat` |
+| RAG chatbot | `GET /rag/architecture`, authenticated `GET /rag/{id}/architecture`, `POST /rag/{id}/chat`, `/quiz`, `/notes` |
 | Health | `GET /`, `GET /health`, `GET /health/database` |
 
 The older predictions routes are not mounted. They did not check who was signed in, so anyone could read another student's history. Enable them only after authentication checks are added.
+
+The separate local ML service also exposes `POST /predict/knowledge-tracing`. It is not an authenticated public app endpoint; run it bound to localhost. Its target is next-interaction session correctness on the Duolingo task, and its item vocabulary is not mapped to app topics.
 
 ## Prediction task and review policy
 
@@ -177,7 +184,24 @@ The prediction task is narrowly defined: **given a learner's ordered study event
 
 The app evaluates a fixed set of candidate delays. A separate policy selects the latest candidate whose predicted next-session score is at least 80%; if none meets the threshold, it chooses the earliest candidate. This policy is experimental and is not evidence that the chosen interval causes better retention.
 
+The dashboard also plots each studied topic's predicted next-session score over the model's supported 30-day horizon. It estimates a review-by date by interpolating where that score curve first crosses below 80%. Treat this as a reminder threshold derived from the next-session predictor, not a measured or guaranteed date when a learner will forget.
+
 `ml/reports/next_session_evaluation.json` records the sampled population, test metrics, 95% learner-cluster bootstrap intervals, calibration error, model comparisons, and validation-selected champion. The public-trace task is a proxy: it predicts a language-learning session score, not course-concept memory. Do not describe it as a validated forgetting probability. See `docs/learner-pilot-protocol.md` for the consented adaptive-versus-fixed learner pilot needed to assess transfer and learning outcomes.
+
+## Knowledge-tracing research prototype
+
+`ml/src/knowledge_tracing.py` implements causal PyTorch LSTM and Transformer candidates for predicting the next observed Duolingo interaction's session-correct fraction. Run one candidate with:
+
+```powershell
+.\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture lstm --protocol forward_time
+.\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture transformer --protocol forward_time
+```
+
+The script streams the local gzip file and defaults to a deterministic 1-in-100 learner sample. It writes per-protocol artifacts and actual metrics under `ml/models/` and `ml/reports/`. The ML API exposes `POST /predict/knowledge-tracing` after the corresponding artifacts are trained. This next-interaction task is not delayed retention, and Duolingo lexeme IDs do not map to app course topics. The KT models therefore are not wired into the course-topic forgetting-date dashboard. The current runs use one seed and remain experimental; see `docs/RESULTS.md`.
+
+## Research documentation
+
+See `docs/IMPLEMENTATION_AUDIT.md`, `docs/RESEARCH_PROPOSAL.md`, `docs/MODEL_ARCHITECTURE.md`, `docs/DATASET_AND_PREPROCESSING.md`, `docs/EXPERIMENT_PROTOCOL.md`, `docs/RESULTS.md`, `docs/API.md`, `docs/SETUP.md`, and `docs/RESEARCH_LIMITATIONS.md` for the audit, model/data contracts, protocols and limitations.
 
 ## Data storage
 
@@ -193,7 +217,7 @@ The app evaluates a fixed set of candidate delays. A separate policy selects the
 |---------|-----|
 | `Could not import module "main"` | Use `uvicorn app.main:app` from inside the `backend` folder. |
 | "Cannot reach the backend" banner | Check that the backend runs on port 8002 and the site opens on port 5500. Close any other Live Server window. |
-| Browser shows a CORS error | Add the page's address to `FRONTEND_ORIGINS` in `backend/.env` and restart the backend. |
+| Browser shows a CORS error | Add the page's address to `FRONTEND_ORIGINS` in the repository-root `.env` and restart the backend. |
 | Progress page says the estimate is unavailable | Start the ML service on port 8000. |
 | Sign-in shows a configuration message | `frontend/js/config.js` still has placeholder values. |
 | Database connection error | Check `DATABASE_URL` and URL-encode the password. Test at `http://127.0.0.1:8002/health/database`. |
@@ -201,7 +225,7 @@ The app evaluates a fixed set of candidate delays. A separate policy selects the
 ## Security
 
 - Keep `.env` out of Git. Never commit an AI provider key.
-- The frontend uses only the Supabase anon key. The database URL belongs only in `backend/.env`.
+- The frontend uses only the Supabase anon key. The database URL belongs only in the repository-root `.env`.
 - Never commit a `service_role` key, a database password or an access token.
 
 ## Limitations

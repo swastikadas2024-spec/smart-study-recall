@@ -3,13 +3,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/app.css?v=forgetting-forecast-1" />
   <script src="js/config.js"></script>
   <script src="js/api.js" defer></script>
   <script src="js/model.js" defer></script>
   <script src="js/local.js" defer></script>
   <script src="js/effects.js" defer></script>
-  <script src="js/dashboard.js" defer></script>
+  <script src="js/dashboard.js?v=forgetting-forecast-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -20,6 +20,7 @@
       <a href="topics.html">Topics</a>
       <a href="materials.html">Materials</a>
       <a href="study.html">Study</a>
+      <a href="chatbot.html">RAG Chatbot</a>
       <a href="planner.html">Planner</a>
       <a href="progress.html">Progress</a>
       <a href="profile.html">Profile</a>
@@ -32,7 +33,7 @@
     <section class="page-title">
       <p class="eyebrow">Dashboard</p>
       <h1 id="greeting" class="display">Hello.</h1>
-      <p class="page-lede">What you studied, when each topic is due to be remembered, and what comes next.</p>
+      <p class="page-lede">What you studied, how each topic's estimated recall decays, and when to review it.</p>
     </section>
     <p id="pageError" class="notice warn" role="alert" hidden></p>
 
@@ -49,6 +50,10 @@
         <div><strong>Plan your next review</strong><span>See what is due and schedule a session</span></div>
         <span class="quick-arrow" aria-hidden="true">↗</span>
       </a>
+      <a class="quick-action" href="chatbot.html">
+        <div><strong>RAG Chatbot</strong><span>Chat with materials using hybrid AI retrieval</span></div>
+        <span class="quick-arrow" aria-hidden="true">↗</span>
+      </a>
     </nav>
 
     <section class="section" aria-labelledby="statsTitle">
@@ -59,17 +64,17 @@
     <section class="section two-col">
       <div class="panel">
         <div class="panel-head">
-          <h2 class="panel-title">Next-session score by review interval</h2>
+          <h2 class="panel-title">Forgetting curve &amp; review reminders</h2>
           <span class="tag estimate">Experimental model</span>
         </div>
-        <p class="muted" style="margin-bottom:14px">Predicted correct-answer fraction at the next session for the review interval selected by the 80% policy. This is not a long-term memory probability.</p>
+        <p class="muted" style="margin-bottom:14px">Each topic curve estimates next-session score as time passes after study. The reminder date is when that estimate crosses below the 80% review threshold. It is a review-by estimate, not a guaranteed date of forgetting.</p>
         <ul id="forecastList" class="rows"></ul>
       </div>
       <div class="panel">
         <h2 class="panel-title">Today</h2>
         <div class="profile-grid">
           <div class="kv"><dt>Focus time today</dt><dd id="todayMinutes">0 min</dd></div>
-          <div class="kv"><dt>Topics for early review</dt><dd id="dueNow">0</dd></div>
+          <div class="kv"><dt>Topics to review within 2 days</dt><dd id="dueNow">0</dd></div>
         </div>
         <p class="muted" style="margin-top:14px">Focus time is timed in this browser. <a href="study.html">Start a focus session</a> or <a href="study.html#quiz">generate a quiz</a>.</p>
       </div>
