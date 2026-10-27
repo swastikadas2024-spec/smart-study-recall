@@ -531,3 +531,47 @@ input:hover, select:hover, textarea:hover { border-color: rgba(200, 243, 106, 0.
   .chat-form { align-items: stretch; flex-direction: column; }
   .manual-study-form { grid-template-columns: 1fr; }
 }
+
+/* ---------- Guided study and quiz flow ---------- */
+.study-shortcuts {
+  position: sticky;
+  top: 72px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 20px;
+  padding: 8px;
+  background: rgba(16, 18, 17, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+}
+.study-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 9px 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 9px;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.study-shortcut span { color: var(--accent); font-size: 11px; font-weight: 700; }
+.study-shortcut strong { font-size: 13px; }
+.study-shortcut:hover, .study-shortcut.is-current { color: var(--ink); background: rgba(200, 243, 106, 0.1); }
+.quiz-availability { min-height: 22px; margin-bottom: 10px; }
+.quiz-progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: var(--surface-2); }
+.quiz-progress-track > span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.25s ease; }
+.quiz-model-impact { margin-top: 16px; padding: 16px; border: 1px solid rgba(200, 243, 106, 0.25); border-radius: 12px; background: rgba(200, 243, 106, 0.055); }
+.quiz-model-impact h3 { margin-bottom: 8px; font-size: 15px; color: var(--accent); }
+.quiz-model-impact p { margin-top: 6px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 900px) {
+  .study-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .study-shortcuts { top: 100px; gap: 4px; padding: 6px; }
+  .study-shortcut { min-height: 42px; gap: 7px; padding: 7px; }
+  .study-shortcut strong { font-size: 12px; }
+}

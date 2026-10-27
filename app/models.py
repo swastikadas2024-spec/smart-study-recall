@@ -212,3 +212,24 @@ class StudyQuizResponse(Base):
     concept: Mapped[str] = mapped_column(String(120), nullable=False)
     is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class StudyRagInteraction(Base):
+    __tablename__ = "study_rag_interactions"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    material_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("public.study_materials.id", ondelete="CASCADE"), nullable=False
+    )
+    student_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("public.profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    rag_mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    retrieval_method: Mapped[str] = mapped_column(String(40), nullable=False)
+    citations: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    diagnostics: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    supported_by_sources: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

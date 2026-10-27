@@ -146,7 +146,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       value: totals.get(d.toDateString()),
     })));
 
-    // Topics needing attention (rule-based priority from the backend).
+    // Topics needing attention (model threshold when available, rule fallback otherwise).
     const attention = recs.recommendations.filter((r) => r.priority !== "low").slice(0, 5);
     $("attention").innerHTML = attention.length
       ? attention.map((r) => `

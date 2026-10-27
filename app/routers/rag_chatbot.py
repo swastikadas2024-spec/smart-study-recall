@@ -10,11 +10,12 @@ Provides endpoints for:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_student
@@ -22,6 +23,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import (
     Profile,
+    StudyRagInteraction,
     StudyMaterial,
     StudyMaterialChunk,
 )
@@ -66,6 +68,14 @@ class RagQuizRequest(BaseModel):
 
 class RagNotesRequest(BaseModel):
     mode: RagMode = Field(default="hybrid")
+
+
+class RagCompareRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=1000)
+
+
+class RagFeedbackRequest(BaseModel):
+    supported_by_sources: bool
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +136,29 @@ def _diagnostics(evidence: list[dict]) -> list[dict]:
             "excerpt": item["chunk"].content[:250],
         }
         for item in evidence
+    ]
+
+
+def _history_turns(interaction: StudyRagInteraction) -> list[dict]:
+    created_at = interaction.created_at.isoformat() if interaction.created_at else None
+    return [
+        {
+            "role": "user",
+            "content": interaction.question,
+            "interaction_id": interaction.id,
+            "created_at": created_at,
+            "mode": interaction.rag_mode,
+        },
+        {
+            "role": "assistant",
+            "content": interaction.answer,
+            "interaction_id": interaction.id,
+            "created_at": created_at,
+            "mode": interaction.rag_mode,
+            "retrieval_method": interaction.retrieval_method,
+            "citations": interaction.citations or [],
+            "supported_by_sources": interaction.supported_by_sources,
+        },
     ]
 
 
@@ -213,6 +246,132 @@ def get_material_architecture(
     }
 
 
+@router.get("/{material_id}/history")
+def get_chat_history(
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
+):
+    """Return persisted chat turns for this learner and material."""
+    material = _material_for_user(db, material_id, current_student)
+    interactions = db.scalars(
+        select(StudyRagInteraction)
+        .where(
+            StudyRagInteraction.material_id == material.id,
+            StudyRagInteraction.student_id == current_student.id,
+        )
+        .order_by(StudyRagInteraction.created_at.desc(), StudyRagInteraction.id.desc())
+        .limit(200)
+    ).all()
+    interactions = list(reversed(interactions))
+    return {"material_id": material.id, "messages": [turn for row in interactions for turn in _history_turns(row)]}
+
+
+@router.post("/{material_id}/interactions/{interaction_id}/feedback")
+def rate_chat_answer(
+    material_id: int,
+    interaction_id: int,
+    request: RagFeedbackRequest,
+    db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
+):
+    """Save the learner's explicit judgment of whether citations support an answer."""
+    _material_for_user(db, material_id, current_student)
+    interaction = db.scalar(
+        select(StudyRagInteraction).where(
+            StudyRagInteraction.id == interaction_id,
+            StudyRagInteraction.material_id == material_id,
+            StudyRagInteraction.student_id == current_student.id,
+        )
+    )
+    if interaction is None:
+        raise HTTPException(status_code=404, detail="Chat answer not found.")
+    interaction.supported_by_sources = request.supported_by_sources
+    db.commit()
+    return {"interaction_id": interaction.id, "supported_by_sources": interaction.supported_by_sources}
+
+
+@router.post("/{material_id}/compare")
+def compare_retrieval_modes(
+    material_id: int,
+    request: RagCompareRequest,
+    db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
+):
+    """Run the same question through each retrieval strategy and report measured retrieval diagnostics."""
+    material = _material_for_user(db, material_id, current_student)
+    chunks = _all_chunks(db, material.id)
+    if not chunks:
+        raise HTTPException(status_code=422, detail="No indexed passages found for this material.")
+
+    gaps = concept_gaps(db, current_student.id, material.id)
+    recency = concept_recency_priority(db, current_student.id, material.id)
+    modes: list[RagMode] = ["standard", "hybrid", "adaptive"]
+    comparisons = []
+    for mode in modes:
+        started = time.perf_counter()
+        base_mode = "standard" if mode == "standard" else "hybrid"
+        evidence = hybrid_retrieve(chunks, request.question, mode=base_mode, limit=len(chunks))
+        intent = "direct_question"
+        if mode == "adaptive":
+            evidence, intent = rerank_with_observed_state(
+                evidence,
+                gaps,
+                recency,
+                request.question,
+                gap_weight=settings.rag_state_gap_weight,
+                recency_weight=settings.rag_state_recency_weight,
+                direct_question_scale=settings.rag_direct_question_state_scale,
+            )
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        top = evidence[:6]
+        rated = db.execute(
+            select(
+                func.count(StudyRagInteraction.id),
+                func.sum(case((StudyRagInteraction.supported_by_sources.is_(True), 1), else_=0)),
+            ).where(
+                StudyRagInteraction.student_id == current_student.id,
+                StudyRagInteraction.material_id == material.id,
+                StudyRagInteraction.rag_mode == mode,
+                StudyRagInteraction.supported_by_sources.is_not(None),
+            )
+        ).one()
+        rated_count = int(rated[0] or 0)
+        supported_count = int(rated[1] or 0)
+        comparisons.append({
+            "mode": mode,
+            "retrieval_method": top[0].get("retrieval_method", "none") if top else "none",
+            "retrieval_latency_ms": round(elapsed_ms, 3),
+            "retrieved_count": len(top),
+            "top_rank_score": round(float(top[0].get("score", 0)), 4) if top else 0.0,
+            "mean_top_k_rank_score": round(sum(float(item.get("score", 0)) for item in top) / len(top), 4) if top else 0.0,
+            "rank_score_is_calibrated_confidence": False,
+            "answer_accuracy": None,
+            "accuracy_status": "Requires human-labeled answer ground truth; not measured by this comparison.",
+            "source_support_votes": rated_count,
+            "source_support_rate": round(supported_count / rated_count, 4) if rated_count else None,
+            "source_support_status": "Learner feedback proxy; not objective answer accuracy." if rated_count else "No learner feedback collected for this mode yet.",
+            "query_intent": intent,
+            "top_passages": [
+                {
+                    "chunk_id": item["chunk"].id,
+                    "chunk_index": item["chunk"].chunk_index,
+                    "rank_score": round(float(item.get("score", 0)), 4),
+                    "excerpt": item["chunk"].content[:240],
+                }
+                for item in top
+            ],
+        })
+
+    return {
+        "question": request.question,
+        "material_id": material.id,
+        "comparison_scope": "retrieval only; generation is not repeated for each strategy",
+        "metrics_note": "Rank scores are query-relative diagnostics, not calibrated confidence. Accuracy requires a judged test set.",
+        "modes": comparisons,
+    }
+
+
 @router.post("/{material_id}/chat")
 def rag_chat(
     material_id: int,
@@ -260,7 +419,22 @@ def rag_chat(
 
     citations = _answer_citations(evidence, answer.get("citation_ids", []))
     intervention = select_study_intervention(gaps, recency, intent) if request.mode == "adaptive" else None
+    saved_diagnostics = _diagnostics(evidence)
+    interaction = StudyRagInteraction(
+        material_id=material.id,
+        student_id=current_student.id,
+        question=request.question,
+        answer=answer["answer"],
+        rag_mode=request.mode,
+        retrieval_method=evidence[0].get("retrieval_method", "none") if evidence else "none",
+        citations=citations,
+        diagnostics=saved_diagnostics,
+    )
+    db.add(interaction)
+    db.commit()
+    db.refresh(interaction)
     response = {
+        "interaction_id": interaction.id,
         "question": request.question,
         "answer": answer["answer"],
         "mode": answer["mode"],
@@ -284,7 +458,7 @@ def rag_chat(
     }
 
     if request.show_diagnostics:
-        response["diagnostics"] = _diagnostics(evidence)
+        response["diagnostics"] = saved_diagnostics
 
     return response
 

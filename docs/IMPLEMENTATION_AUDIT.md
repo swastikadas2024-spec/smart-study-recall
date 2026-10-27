@@ -1,47 +1,50 @@
 # Repository implementation audit
 
-Audit snapshot: 2026-10-26, before the research-prototype changes in this task. Existing uncommitted work was present and is being preserved.
+Audit date: 2026-10-27. Latest inspected commit: `05c5587` (`Add research prototype and adaptive study tools`). See [RECENT_COMMIT_REVIEW.md](RECENT_COMMIT_REVIEW.md) for the file-by-file change summary. At audit time the worktree was clean and `main` matched its local `origin/main` tracking ref; network fetch was blocked by write permission on `.git/FETCH_HEAD`, so no fresh remote comparison was possible.
 
-## Architecture found
+## Architecture
 
-- Frontend: static HTML, CSS and browser JavaScript under `frontend/`; no bundler or package manifest was found.
-- Application API: FastAPI under `app/`, SQLAlchemy models and Supabase Auth token verification. App data uses PostgreSQL configured through the repository-root `.env`.
-- ML API: a separate FastAPI service under `ml/src/api.py`.
-- Dataset: a local ignored copy of Duolingo Learning Traces at `ml/data/raw/settles.acl16.learning_traces.13m.csv.gz`.
-- Migrations: SQL files under `migrations/`. Existing schema contains profiles, topics, learning events, revision schedules, study materials/chunks, material quiz sessions and quiz responses.
-- Deployment: local development instructions are in README; no Docker, CI workflow, frontend package/build configuration, or test configuration was found in the repository inventory.
+- Frontend: static HTML, CSS and browser JavaScript under `frontend/`.
+- App API: FastAPI and SQLAlchemy under `app/`; Supabase bearer authentication and PostgreSQL configuration from the repository-root `.env`.
+- ML API: separate FastAPI service under `ml/src/api.py`, usually bound to localhost on port 8000.
+- Data: local ignored Duolingo Learning Traces gzip at `ml/data/raw/settles.acl16.learning_traces.13m.csv.gz`; it is not included in Git.
+- Persistence: existing SQL migrations and tables for users/profiles, topics, learning events, schedules, study materials/chunks and material quiz sessions/responses.
+- Tooling: no frontend build system, CI, Docker, pytest configuration, linter, formatter or type checker was found. Tests are Python `unittest` suites.
 
-## Existing functionality
+## Working features
 
-- Authenticated student, topic, learning-event, schedule, dashboard, recommendation and topic-recall routes are mounted in `app/main.py`.
-- A legacy predictions router is intentionally not mounted because its student-history endpoints lack ownership checks.
-- Study quiz scores create `LearningEvent` rows. Focus timer and manual focus-time entries use browser `localStorage`; duration alone does not create recall labels.
-- Material upload extracts PDF, DOCX, TXT and Markdown text, stores overlapping chunks, and supports notes, quizzes and chat. The RAG chatbot provides BM25-only and BM25 + TF-IDF cosine retrieval with reciprocal-rank fusion, then uses a configured OpenAI-compatible LLM or extractive fallback.
-- Material quiz responses store concept labels and correctness. `concept_gaps` derives a simple per-material weakness score from repeated responses; the existing hybrid RAG uses that signal to boost matching passages. The `standard` path also currently includes a gap boost, so it is not a clean non-personalized baseline.
-- Existing HLR, linear regression, Random Forest, GRU and mean baselines share a next-observed-session score task in `ml/src/train_next_session_model.py`. The saved champion is selected by mean validation MAE across forward-time and learner-held-out splits. The report records the GRU's lower ECE but higher MAE than HLR.
-- The dashboard's current “forgetting date” is computed by interpolating the first predicted next-session score crossing below 0.80. This is an estimated review threshold, not a measured forgetting event.
+- Authenticated topic, learning-event, dashboard, schedule, recommendation, material upload and study-tool routes.
+- Topic sessions and answer correctness are persisted as learning events. Manual focus duration and flashcards are browser-local; duration is not a recall label.
+- Material upload extracts PDF, DOCX, TXT and Markdown, stores passage chunks and supports notes, quiz generation and grounded chat with provider or extractive fallback.
+- `frontend/chatbot.html` invokes the existing app RAG API with Standard BM25, Hybrid BM25+TF-IDF/RRF, or experimental Recall-aware retrieval. The latter reorders evidence using observed material-quiz concept gaps and recency. It is an interpretable heuristic, not a neural reranker.
+- The dashboard invokes the existing candidate-gap service using a validation-selected HLR champion. HLR, linear, Random Forest, GRU and mean baselines have an evaluation report. The dashboard's 80% crossing is a policy-derived estimate, not a validated forgetting date.
+- The separate ML API serves next-interaction KT checkpoints. MLP, LSTM and Transformer input share the same causal per-event feature windows with a same-timestamp boundary; preprocessing is fit on the training partition. The MLP uses a masked order-agnostic event summary, while the recurrent/attention candidates model order.
 
-## Data and model scope
+## Prediction target, data, and model limits
 
-The dataset header is `p_recall,timestamp,delta,user_id,learning_language,ui_language,lexeme_id,lexeme_string,history_seen,history_correct,session_seen,session_correct`. It supports interaction-sequence and next-session-score experiments. It does not contain the app's course concepts, uploaded passages, misconception annotations, or a controlled delayed-retention outcome. The current model's target is next session `session_correct / session_seen`, not delayed forgetting.
+The Duolingo target is observed `session_correct / session_seen` for a next interaction/session. It is not delayed recall, course-topic mastery, or a confirmed time of forgetting. The trace has lexeme IDs and interaction counts but no app material concept mapping, misconception labels, passage relevance judgments, or app-specific delayed test outcomes. Transfer to this app is unvalidated.
 
-The latest evaluation report documents 617 deterministically sampled learners and 62,931 eligible next-session pairs from a 1-in-100 learner hash sample. It uses chronological and disjoint-learner splits, three seeds, MAE/RMSE/ECE, and learner-cluster bootstrap intervals. It does not report training-set metrics, retrieval/generation metrics, or app-domain validation.
+The existing next-session comparison uses 617 sampled learners and 62,931 examples, deterministic learner sampling, temporal and learner-held-out splits, three seeds, and learner-cluster intervals. The new MLP/LSTM/Transformer KT forward-time comparison uses a 119,140-event / 1,118-learner 1-in-100 sample, one seed, and timestamp-group-safe 70/15/15 cutoffs. A separate MLP/LSTM learner-held-out comparison uses the same smaller 1-in-500 sample. The older unqualified `knowledge_tracing_evaluation.json` is a separate 1-in-500 forward-time LSTM run. All KT metrics are preliminary and must not be mixed across samples/protocols.
 
-## Baseline checks before changes
+## RAG state and evidence
 
-- `ml/src/test_prediction_pipeline.py` ran successfully as a prediction smoke script and printed three RF-1 estimates. It is not an assertion-based unit-test suite.
-- `python -m pytest --collect-only -q` could not run because `pytest` is not installed in the project virtual environment; no pytest configuration or test directory was found.
-- `backend/test_db_connection.py` is a live database connectivity probe, not a hermetic test. It was not run because it depends on the user's private `.env` and external Supabase/PostgreSQL access.
+Standard and hybrid retrieval are non-personalized baselines. Recall-aware mode uses material quiz history to derive heuristic concept gaps and time since last quiz, then applies intent-sensitive reranking. Answer citations are filtered to retrieved chunk IDs. The system has no reviewed query-passage benchmark, answer-support annotations, persistent user-state evaluation log, retrieval metrics, or learning-outcome study; these are **Not evaluated**.
 
-## Known gaps and risks
+## Test status
 
-- No app-authenticated knowledge-tracing endpoint or trained LSTM/Transformer KT model existed at audit time.
-- Existing RAG personalization is a deterministic concept-gap boost, not a learned reranker or a predicted mastery model. Its standard mode was not an unpersonalized baseline.
-- There is no judged retrieval set or human-reviewed answer/evidence dataset, so RAG quality cannot yet be quantified.
-- App course topics do not map to Duolingo lexeme IDs. Transferring Duolingo sequence-model scores to app topics would be unsupported without consented, task-matched learner data.
-- Focus duration is browser-local; it is not a learning outcome and is not used as a recall target.
-- No backend tests, frontend automated tests, schema migration tests, or CI checks were found.
+Before follow-up edits, baseline unit suites passed:
 
-## Existing uncommitted user changes
+- `.\.venv\Scripts\python.exe -m unittest discover -s ml\tests -v`: 6 passed.
+- `.\.venv\Scripts\python.exe -m unittest discover -s app\tests -v`: 5 passed.
 
-At audit time, `git status` showed pre-existing edits to dashboard, forecast service, ML API, README and several frontend pages, plus a new RAG chatbot route/service/page. These are user work and were kept intact while adding the research prototype.
+After follow-up edits, `.\.venv\Scripts\python.exe -m unittest discover -s ml\tests -v` ran 8 tests and `.\.venv\Scripts\python.exe -m unittest discover -s app\tests -v` ran 5 tests; both passed. Python compilation and Node syntax checks passed, as did `git diff --check`. The MLP model loaded from its forward-time checkpoint and returned a local next-interaction prediction. New MLP/optimizer results use seed 42 and a three-epoch maximum; they are preliminary single-run measurements.
+
+The PyTorch Transformer test emits a benign nested-tensor warning. A prior FastAPI TestClient health smoke request stalled on this Windows runtime, so a full live endpoint/database health smoke was inconclusive. Direct LSTM checkpoint inference succeeded. The live Supabase database was not contacted; it uses private credentials. Pytest is not installed. The database probe is not a hermetic test.
+
+## Technical debt and next work
+
+- Repeat MLP/optimizer and LSTM/Transformer comparisons with multiple seeds and learner-held-out splits using the same sample.
+- Build and review course-topic delayed assessment data before using these models for the dashboard's topic-level forecast.
+- Create human-judged passage relevance and answer-grounding sets before reporting RAG metrics.
+- Improve robust API integration/smoke testing and add frontend behavior tests.
+- Perform a literature and patent search before asserting novelty. Integration of known methods is not itself evidence of novelty.

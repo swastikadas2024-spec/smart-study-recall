@@ -40,6 +40,7 @@ class KnowledgeTracingApiTests(unittest.TestCase):
     def test_architecture_is_restricted_to_available_candidates(self):
         with self.assertRaises(ValueError):
             self.request(architecture="gru")
+        self.assertEqual(self.request(architecture="mlp").architecture, "mlp")
 
 
 if __name__ == "__main__":

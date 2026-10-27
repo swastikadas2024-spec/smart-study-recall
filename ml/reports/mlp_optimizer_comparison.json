@@ -1,0 +1,192 @@
+{
+  "experiment": "MLP optimizer comparison",
+  "target": "next interaction session_correct / session_seen",
+  "target_is_delayed_recall": false,
+  "dataset": "Duolingo Learning Traces",
+  "sample_modulus": 100,
+  "examples": 119140,
+  "learners": 1118,
+  "protocol": "forward_time",
+  "split_boundaries": {
+    "validation_start_timestamp": 1362754724.0,
+    "test_start_timestamp": 1362934842.0,
+    "rule": "event-count quantile cutoffs snapped to complete timestamp groups"
+  },
+  "split_sizes": {
+    "train": 83383,
+    "validation": 17880,
+    "test": 17877
+  },
+  "seed": 42,
+  "loss": "question-count weighted binomial log loss",
+  "common_test_baselines": {
+    "mean": {
+      "weighted_mae": 0.15254598712427575,
+      "weighted_rmse": 0.22662724863175088,
+      "weighted_binomial_log_loss": 0.32405865616616875,
+      "weighted_brier_score": 0.05135990982239743,
+      "weighted_ece_10_bins": 3.198215672028937e-05,
+      "weighted_roc_auc": 0.5
+    },
+    "random_forest": {
+      "weighted_mae": 0.14724043810848386,
+      "weighted_rmse": 0.22246242962235116,
+      "weighted_binomial_log_loss": 0.31703935127385674,
+      "weighted_brier_score": 0.04948953259347954,
+      "weighted_ece_10_bins": 0.010359005145142607,
+      "weighted_roc_auc": 0.5959328645183766
+    }
+  },
+  "runs": [
+    {
+      "optimizer": "adamw",
+      "requested_max_epochs": 8,
+      "epochs_run": 4,
+      "best_epoch": 2,
+      "best_validation_binomial_loss": 0.2998516857624054,
+      "training_history": [
+        {
+          "epoch": 1,
+          "train_weighted_binomial_loss": 0.3424520145933292,
+          "validation_weighted_binomial_loss": 0.3015022873878479
+        },
+        {
+          "epoch": 2,
+          "train_weighted_binomial_loss": 0.3208411677391072,
+          "validation_weighted_binomial_loss": 0.2998516857624054
+        },
+        {
+          "epoch": 3,
+          "train_weighted_binomial_loss": 0.3175791677852674,
+          "validation_weighted_binomial_loss": 0.3003062605857849
+        },
+        {
+          "epoch": 4,
+          "train_weighted_binomial_loss": 0.3152020209897901,
+          "validation_weighted_binomial_loss": 0.2999480068683624
+        }
+      ],
+      "test_metrics": {
+        "weighted_mae": 0.14435994156626658,
+        "weighted_rmse": 0.22473335563683136,
+        "weighted_binomial_log_loss": 0.3199524157536368,
+        "weighted_brier_score": 0.05050508113579052,
+        "weighted_ece_10_bins": 0.008227793003354031,
+        "weighted_roc_auc": 0.5868759671806238
+      },
+      "artifact": "ml/models/knowledge_tracer_mlp_forward_time.pt",
+      "artifact_sha256": "d6071f5c9319e0f9c2959871dae224bb138720c6a4ed540de9a9b1c2bccf56e0",
+      "evaluation_report": "ml/reports/knowledge_tracing_mlp_forward_time_evaluation.json"
+    },
+    {
+      "optimizer": "adam",
+      "requested_max_epochs": 3,
+      "epochs_run": 3,
+      "best_epoch": 3,
+      "best_validation_binomial_loss": 0.2990715801715851,
+      "training_history": [
+        {
+          "epoch": 1,
+          "train_weighted_binomial_loss": 0.34242168729011185,
+          "validation_weighted_binomial_loss": 0.30114084482192993
+        },
+        {
+          "epoch": 2,
+          "train_weighted_binomial_loss": 0.3209116767655094,
+          "validation_weighted_binomial_loss": 0.29919925332069397
+        },
+        {
+          "epoch": 3,
+          "train_weighted_binomial_loss": 0.3184578282914843,
+          "validation_weighted_binomial_loss": 0.2990715801715851
+        }
+      ],
+      "test_metrics": {
+        "weighted_mae": 0.13943256600371148,
+        "weighted_rmse": 0.22499146553232044,
+        "weighted_binomial_log_loss": 0.3210334452760072,
+        "weighted_brier_score": 0.05062115956238134,
+        "weighted_ece_10_bins": 0.01677726301133052,
+        "weighted_roc_auc": 0.5914187693507278
+      },
+      "artifact": "ml/models/knowledge_tracer_mlp_adam_forward_time.pt",
+      "artifact_sha256": "57886d25de31e12e65da243f07f21d4b5383adf09e94322ada0bd5a0facfc73c",
+      "evaluation_report": "ml/reports/knowledge_tracing_mlp_adam_forward_time_evaluation.json"
+    },
+    {
+      "optimizer": "rmsprop",
+      "requested_max_epochs": 3,
+      "epochs_run": 3,
+      "best_epoch": 3,
+      "best_validation_binomial_loss": 0.298423707485199,
+      "training_history": [
+        {
+          "epoch": 1,
+          "train_weighted_binomial_loss": 0.3272473095543046,
+          "validation_weighted_binomial_loss": 0.301474004983902
+        },
+        {
+          "epoch": 2,
+          "train_weighted_binomial_loss": 0.3194586049864535,
+          "validation_weighted_binomial_loss": 0.300307959318161
+        },
+        {
+          "epoch": 3,
+          "train_weighted_binomial_loss": 0.31759492428845953,
+          "validation_weighted_binomial_loss": 0.298423707485199
+        }
+      ],
+      "test_metrics": {
+        "weighted_mae": 0.1472806908515303,
+        "weighted_rmse": 0.2243840397889366,
+        "weighted_binomial_log_loss": 0.3188880227406637,
+        "weighted_brier_score": 0.05034819731200307,
+        "weighted_ece_10_bins": 0.00784023192852569,
+        "weighted_roc_auc": 0.5923000203471307
+      },
+      "artifact": "ml/models/knowledge_tracer_mlp_rmsprop_forward_time.pt",
+      "artifact_sha256": "2ebb1aec26f6ae1712c92527affbe2f9dbaf459a694507c8bd92ccd59323125a",
+      "evaluation_report": "ml/reports/knowledge_tracing_mlp_rmsprop_forward_time_evaluation.json"
+    },
+    {
+      "optimizer": "sgd",
+      "requested_max_epochs": 3,
+      "epochs_run": 3,
+      "best_epoch": 3,
+      "best_validation_binomial_loss": 0.3043213486671448,
+      "training_history": [
+        {
+          "epoch": 1,
+          "train_weighted_binomial_loss": 0.35144602706793,
+          "validation_weighted_binomial_loss": 0.3072030544281006
+        },
+        {
+          "epoch": 2,
+          "train_weighted_binomial_loss": 0.3227221096342808,
+          "validation_weighted_binomial_loss": 0.30521056056022644
+        },
+        {
+          "epoch": 3,
+          "train_weighted_binomial_loss": 0.3213163322212456,
+          "validation_weighted_binomial_loss": 0.3043213486671448
+        }
+      ],
+      "test_metrics": {
+        "weighted_mae": 0.1495778299959811,
+        "weighted_rmse": 0.22524845731660534,
+        "weighted_binomial_log_loss": 0.3208261389825154,
+        "weighted_brier_score": 0.05073686752351057,
+        "weighted_ece_10_bins": 0.002943079801175269,
+        "weighted_roc_auc": 0.5738018021048975
+      },
+      "artifact": "ml/models/knowledge_tracer_mlp_sgd_forward_time.pt",
+      "artifact_sha256": "8e30a21471c58ed02d1a99dfd751a3748c072a83b62b32022f554d0b14f0ae00",
+      "evaluation_report": "ml/reports/knowledge_tracing_mlp_sgd_forward_time_evaluation.json"
+    }
+  ],
+  "limitations": [
+    "Single seed; optimizer run caps differ (AdamW requested 8 and early-stopped after 4; other runs requested 3).",
+    "The target is a Duolingo next-interaction session score, not delayed course-topic recall.",
+    "Do not infer optimizer superiority without repeated seeds and paired uncertainty intervals."
+  ]
+}

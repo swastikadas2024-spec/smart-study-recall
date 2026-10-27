@@ -129,19 +129,33 @@ def get_revision_recommendations(
             ) <= now
         ]
 
-        # Transparent rule-based priority; not an ML prediction.
-        if accuracy is None:
+        # Use the model's estimated 80% crossing for priority when available;
+        # retain an explicit accuracy/recency fallback for unsupported cases.
+        if next_session_prediction.get("available"):
+            days_to_threshold = next_session_prediction.get("days_until_predicted_forgetting")
+            if next_session_prediction.get("forgetting_forecast_status") in {
+                "threshold_already_crossed", "below_threshold_at_first_sample"
+            } or (isinstance(days_to_threshold, (int, float)) and days_to_threshold <= 2):
+                priority = "high"
+                reason = "The model estimates this topic is at or below the 80% review threshold."
+            elif isinstance(days_to_threshold, (int, float)) and days_to_threshold <= 7:
+                priority = "medium"
+                reason = f"The model estimates the 80% review threshold in about {days_to_threshold:.1f} days."
+            else:
+                priority = "low"
+                reason = "The model estimates recall remains above the 80% review threshold for now."
+        elif accuracy is None:
             priority = "high"
-            reason = "No questions have been recorded for this topic."
+            reason = "No questions have been recorded for this topic; log a session to estimate its recall curve."
         elif accuracy < 0.60:
             priority = "high"
-            reason = "Recorded accuracy is below 60%."
+            reason = "The recall model is unavailable; recorded accuracy is below 60%."
         elif accuracy < 0.80:
             priority = "medium"
-            reason = "Recorded accuracy is below 80%."
+            reason = "The recall model is unavailable; recorded accuracy is below 80%."
         else:
             priority = "low"
-            reason = "Recorded accuracy is at least 80%."
+            reason = "The recall model is unavailable; recorded accuracy is at least 80%."
 
         if overdue_schedules:
             priority = "high"
@@ -175,6 +189,13 @@ def get_revision_recommendations(
             if days_since_study is not None else None,
             "last_studied_at": latest_event_time,
             "next_existing_revision_at": next_revision_at,
+            "recommended_review_in_days": next_session_prediction.get("recommended_review_in_days") if next_session_prediction.get("available") else None,
+            "recommended_review_at": (
+                now + timedelta(days=float(next_session_prediction["recommended_review_in_days"]))
+                if next_session_prediction.get("available")
+                and isinstance(next_session_prediction.get("recommended_review_in_days"), (int, float))
+                else None
+            ),
             "overdue_revisions": len(overdue_schedules),
             "suggested_action": (
                 "Revise this topic and review your mistakes."
@@ -201,12 +222,8 @@ def get_revision_recommendations(
     return {
         "student_id": student.id,
         "student_name": student.student_name,
-        "recommendation_method": "rule_based",
-        "note": (
-            "Priorities use recorded accuracy, study recency, and "
-            "overdue revisions. They are heuristic recommendations, "
-            "not validated predictions of forgetting."
-        ),
+        "recommendation_method": "model_threshold_with_rule_fallback",
+        "note": "When available, priorities and review intervals use the trained next-session score curve and an 80% threshold. Forecasts are experimental proxies, not validated probabilities of long-term memory; accuracy-based rules are used when model output is unavailable.",
         "recommendations": recommendations,
     }
 
@@ -358,4 +375,96 @@ def schedule_recommended_revision(
             if model_policy_used
             else "The model was unavailable, so a conservative rule-based interval was used."
         ),
+    }
+
+
+@router.post("/{student_id}/auto-schedule")
+def auto_schedule_model_revisions(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_student: Profile = Depends(get_current_student),
+):
+    """Create one pending review for each topic with a supported model forecast."""
+    require_student_owner(student_id, current_student)
+    recommendation_result = get_revision_recommendations(student_id, db, current_student)
+    schedules = db.scalars(
+        select(RevisionSchedule).where(RevisionSchedule.student_id == student_id)
+    ).all()
+    now = datetime.now(timezone.utc)
+    created = []
+    skipped = []
+
+    for recommendation in recommendation_result["recommendations"]:
+        topic_id = recommendation["topic_id"]
+        topic_schedules = [schedule for schedule in schedules if schedule.topic_id == topic_id]
+        pending = [schedule for schedule in topic_schedules if not schedule.completed]
+        if pending:
+            skipped.append({"topic_id": topic_id, "reason": "A pending review is already scheduled."})
+            continue
+
+        completed_times = [
+            schedule.scheduled_at.replace(tzinfo=timezone.utc)
+            if schedule.scheduled_at.tzinfo is None else schedule.scheduled_at
+            for schedule in topic_schedules if schedule.completed
+        ]
+        last_studied = recommendation.get("last_studied_at")
+        if completed_times and (
+            last_studied is None
+            or (last_studied.replace(tzinfo=timezone.utc) if last_studied.tzinfo is None else last_studied)
+            <= max(completed_times)
+        ):
+            skipped.append({"topic_id": topic_id, "reason": "Log a new study session after the completed review before scheduling the next cycle."})
+            continue
+
+        prediction = recommendation.get("next_session_prediction") or {}
+        interval = prediction.get("recommended_review_in_days")
+        if (
+            not prediction.get("available")
+            or not isinstance(interval, (int, float))
+            or not math.isfinite(interval)
+            or interval <= 0
+        ):
+            skipped.append({
+                "topic_id": topic_id,
+                "reason": prediction.get("reason", "A trained model forecast is not available for this topic."),
+            })
+            continue
+
+        revision = RevisionSchedule(
+            student_id=student_id,
+            topic_id=topic_id,
+            scheduled_at=now + timedelta(days=float(interval)),
+        )
+        db.add(revision)
+        db.flush()
+        created.append({
+            "id": revision.id,
+            "student_id": student_id,
+            "topic_id": topic_id,
+            "topic_name": recommendation["topic_name"],
+            "scheduled_at": revision.scheduled_at,
+            "completed": False,
+            "rescheduled_count": 0,
+            "interval_days": interval,
+            "predicted_next_session_score": prediction.get("recommended_predicted_score"),
+            "target_score": prediction.get("target_score", 0.80),
+            "predicted_forgetting_at": prediction.get("predicted_forgetting_at"),
+            "source": "next_session_score_threshold_policy",
+            "experimental": True,
+        })
+        schedules.append(revision)
+
+    if created:
+        db.commit()
+    else:
+        db.rollback()
+
+    return {
+        "student_id": student_id,
+        "created_count": len(created),
+        "created": created,
+        "skipped": skipped,
+        "recommendations": recommendation_result["recommendations"],
+        "policy": "Schedule the latest supported interval whose predicted next-session score meets the 80% target.",
+        "experimental": True,
     }

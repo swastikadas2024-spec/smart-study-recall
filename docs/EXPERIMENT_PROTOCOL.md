@@ -8,9 +8,9 @@ The existing champion objective is mean validation MAE across both splits. It is
 
 ## Knowledge-tracing experiments
 
-Use chronological target-time splits and learner-disjoint splits. At each target, inputs must stop before the target response. Any user/item encoders, scalers, or vocabulary cutoffs must be fit on the training partition only; unknown validation/test IDs use a documented OOV path. Report ROC-AUC, log loss, Brier score, accuracy/F1 at a predeclared threshold, calibration, and per-user bootstrap intervals when labels are binary. For aggregated fractional outcomes, report MAE/RMSE and justify weighting.
+Use chronological target-time splits and learner-disjoint splits. The forward-time splitter snaps 70/85% event-count cutoffs to whole timestamp groups so simultaneous records cannot straddle partitions; reports record the cutoff timestamps. At each target, inputs must stop before the target response. Any user/item encoders, scalers, or vocabulary cutoffs must be fit on the training partition only; unknown validation/test IDs use a documented OOV path. Report ROC-AUC, log loss, Brier score, accuracy/F1 at a predeclared threshold, calibration, and per-user bootstrap intervals when labels are binary. For aggregated fractional outcomes, report MAE/RMSE and justify weighting.
 
-The first LSTM and Transformer run is implemented in `ml/src/train_knowledge_tracer.py`. It currently uses one seed and a three-epoch cap in the recorded report. It is an initial engineering experiment, not the final repeated-run protocol. Before selecting a model, repeat multiple seeds, add learner-cluster intervals, compare the same model/configuration on both protocols and assess calibration differences with paired learner bootstrap samples.
+The trainer implements MLP, LSTM and Transformer, with AdamW, Adam, RMSProp and momentum-SGD choices. The recorded MLP/optimizer comparison uses seed 42, a 1-in-100 forward-time split and a three-epoch maximum; the MLP/LSTM learner-held-out comparison uses the smaller 1-in-500 sample. These are engineering experiments, not the final repeated-run protocol. Before selecting a model, repeat multiple seeds, add learner-cluster intervals, compare the same models/configuration on both protocols and assess calibration differences with paired learner bootstrap samples.
 
 ## RAG experiments
 

@@ -7,12 +7,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const state = {
     materials: [],
     active: null,
+    studentId: null,
     mode: "hybrid",
     chatHistory: [],
     chatStarted: false,
     showDiag: false,
     lastDiagnostics: null,
     archData: null,
+    flowTimer: null,
+    flowStep: 0,
+    lastQuestion: "",
   };
   const modeShort = (mode) => ({
     standard: "Standard",
@@ -69,16 +73,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function saveSetup() {
+    if (!state.studentId) return;
+    try {
+      localStorage.setItem(`ssr.rag.setup.${state.studentId}`, JSON.stringify({
+        material_id: state.active?.id || null,
+        mode: state.mode,
+      }));
+    } catch (error) { /* Saving these preferences is a convenience. */ }
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    $("ragMode").value = mode;
+    const descriptions = {
+      standard: "Fast keyword search (BM25). Best when the question uses the same terms as the source.",
+      hybrid: "Recommended · combines keyword matching with TF-IDF similarity. The answer-generation provider is configured by the project administrator.",
+      adaptive: "Hybrid retrieval, then a transparent rerank using your material quiz gaps and time since quizzing.",
+    };
+    $("ragModeHelp").textContent = descriptions[mode];
+    $("ragModeIndicator").textContent = modeName(mode);
+    $("toolsRagMode").textContent = modeShort(mode);
+    saveSetup();
+    if (!$("architecturePanel").hidden && state.archData) renderArchitecture(state.archData, mode);
+  }
+
+  $("ragMode").addEventListener("change", () => setMode($("ragMode").value));
+
   // ---------- Material selection ----------
-  $("materialSelect").addEventListener("change", async () => {
-    const id = Number($("materialSelect").value);
+  async function selectMaterial(id) {
     if (!id) {
       state.active = null;
+      state.archData = null;
+      if (state.flowTimer) window.clearInterval(state.flowTimer);
+      state.flowTimer = null;
       $("chatSection").hidden = true;
       $("toolsSection").hidden = true;
       $("architectureSection").hidden = true;
       $("diagnosticsSection").hidden = true;
       $("materialInfo").hidden = true;
+      saveSetup();
       return;
     }
     const material = state.materials.find((m) => m.id === id);
@@ -86,43 +120,73 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.active = material;
     state.chatHistory = [];
     state.chatStarted = false;
+    state.lastQuestion = "";
     resetChat();
+    saveSetup();
 
     $("chatSection").hidden = false;
     $("toolsSection").hidden = false;
     $("architectureSection").hidden = false;
+    $("architecturePanel").hidden = false;
+    $("toggleArch").textContent = "Hide pipeline";
     $("diagnosticsSection").hidden = true;
     $("materialInfo").hidden = false;
     $("materialChunks").textContent = `${material.chunk_count} indexed passages`;
     $("ragModeIndicator").textContent = modeName(state.mode);
     $("toolsRagMode").textContent = modeShort(state.mode);
 
-    // Load architecture data
     await run(async () => {
       const archData = await S.api(`/rag/${id}/architecture`);
       state.archData = archData;
       $("materialGaps").textContent = `${archData.recall_gap_count} recall gaps tracked`;
+      renderArchitecture(archData, state.mode);
     });
-  });
+    try {
+      await loadSavedHistory(id);
+    } catch (error) {
+      resetChat();
+      const detail = error.status === 404
+        ? `The running backend does not recognize the chat-history route. Stop and restart the main FastAPI backend from this project, then refresh. (${error.message})`
+        : error.status >= 500
+          ? `Chat history failed on the backend. Confirm migrations/004_rag_chat_history.sql has been run in Supabase. (${error.message})`
+          : `Chat history could not be loaded. (${error.message})`;
+      S.showError("pageError", new Error(detail));
+    }
+  }
 
-  // ---------- RAG mode toggle ----------
-  document.querySelectorAll(".rag-mode-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".rag-mode-btn").forEach((b) => {
-        b.classList.remove("is-active");
-        b.setAttribute("aria-checked", "false");
-      });
-      btn.classList.add("is-active");
-      btn.setAttribute("aria-checked", "true");
-      state.mode = btn.dataset.mode;
-      $("ragModeIndicator").textContent = modeName(state.mode);
-      $("toolsRagMode").textContent = modeShort(state.mode);
-
-      // Re-render architecture if visible
-      if (!$("architecturePanel").hidden && state.archData) {
-        renderArchitecture(state.archData, state.mode);
+  async function loadSavedHistory(materialId) {
+    const result = await S.api(`/rag/${materialId}/history`);
+    state.chatHistory = [];
+    state.chatStarted = false;
+    state.lastQuestion = "";
+    resetChat();
+    (result.messages || []).forEach((message) => {
+      if (message.role === "user") {
+        state.lastQuestion = message.content;
+        state.chatHistory.push({ role: "user", content: message.content });
+        addMessage("user", `<p>${S.esc(message.content)}</p>`);
+      } else if (message.role === "assistant") {
+        state.chatHistory.push({ role: "assistant", content: message.content });
+        addMessage("assistant", `<p>${S.esc(message.content)}</p>${citationsHTML(message.citations)}
+          <div class="rag-msg-meta"><span class="rag-msg-tag">${S.esc(modeName(message.mode))}</span><span class="rag-msg-tag">${S.esc(message.retrieval_method || "retrieval")}</span></div>
+          ${feedbackHTML(message.interaction_id, message.supported_by_sources)}`);
       }
     });
+    if (!state.chatStarted) resetChat();
+  }
+
+  function feedbackHTML(interactionId, value) {
+    if (!interactionId) return "";
+    const status = value === true ? "You marked this answer supported by its sources."
+      : value === false ? "You marked this answer unsupported by its sources."
+        : "Did the cited passages support this answer?";
+    return `<div class="rag-feedback"><span class="rag-feedback-status">${status}</span>
+      ${value === null || value === undefined ? `<button class="btn small ghost" type="button" data-supported="true" data-interaction="${interactionId}">Yes</button>
+        <button class="btn small ghost" type="button" data-supported="false" data-interaction="${interactionId}">No</button>` : ""}</div>`;
+  }
+
+  $("materialSelect").addEventListener("change", async () => {
+    await selectMaterial(Number($("materialSelect").value));
   });
 
   // ---------- Architecture visualisation ----------
@@ -131,6 +195,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isHidden = panel.hidden;
     panel.hidden = !isHidden;
     $("toggleArch").textContent = isHidden ? "Hide pipeline" : "Show pipeline";
+    if (!isHidden && state.flowTimer) {
+      window.clearInterval(state.flowTimer);
+      state.flowTimer = null;
+      $("pipelineFlow").querySelectorAll(".is-flow-active").forEach((stage) => stage.classList.remove("is-flow-active"));
+    }
     if (isHidden && state.archData) {
       renderArchitecture(state.archData, state.mode);
     }
@@ -154,6 +223,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       renderStandardFlow(flow, steps);
     }
+    startFlowAnimation(flow);
 
     // Render retrieval details
     const details = $("retrievalDetails");
@@ -221,7 +291,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         <p class="rag-pro">RRF fusion balances precision & recall</p>
         <p class="rag-pro">Better paraphrase handling</p>
         <p class="rag-pro">Robust for diverse queries</p>
-        <p class="rag-con">Slight TF-IDF vectorisation overhead</p>
+        <p class="rag-con">TF-IDF vectors are rebuilt at query time</p>
+        <p class="rag-con">No persistent embedding/vector index</p>
         <p class="rag-con">More complex debug surface</p>
       </div>
       <div class="rag-compare-card ${mode === 'adaptive' ? 'is-active' : ''}">
@@ -233,6 +304,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         <p class="rag-con">No judged retrieval evaluation yet</p>
       </div>
     `;
+  }
+
+  function startFlowAnimation(container) {
+    if (state.flowTimer) window.clearInterval(state.flowTimer);
+    const stages = [...container.querySelectorAll(".rag-step")];
+    if (stages.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    state.flowStep = 0;
+    const activate = () => {
+      stages.forEach((stage, index) => stage.classList.toggle("is-flow-active", index === state.flowStep));
+      state.flowStep = (state.flowStep + 1) % stages.length;
+    };
+    activate();
+    state.flowTimer = window.setInterval(activate, 1500);
   }
 
   function renderStandardFlow(container, steps) {
@@ -393,6 +477,50 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
+  async function compareModes() {
+    if (!state.active) throw new Error("Choose a material first.");
+    const question = $("chatInput").value.trim() || state.lastQuestion;
+    if (question.length < 3) throw new Error("Ask a question first, then compare retrieval strategies.");
+    const panel = $("modeComparison");
+    panel.hidden = false;
+    panel.innerHTML = '<p class="muted">Running the same question through all three retrieval strategies…</p>';
+    const result = await S.api(`/rag/${state.active.id}/compare`, { method: "POST", body: { question } });
+    const help = {
+      latency: "Retrieval elapsed time: 1000 × (time after retrieval − time before retrieval), in milliseconds. Excludes generation and network delay.",
+      retrieved: "Number of passages returned in the top-six result set.",
+      top: "Final ranking score for the first retrieved passage. Query-relative diagnostic, not a probability.",
+      mean: "Mean final ranking score of returned top-six passages: sum of their scores ÷ number returned.",
+      support: "Learner feedback proxy: answers marked Yes ÷ all rated answers for this material and strategy. Not objective accuracy.",
+      accuracy: "Answer accuracy = human-judged correct answers ÷ all human-judged answers. No labeled benchmark is configured, so this is not evaluated.",
+      confidence: "Calibrated confidence needs predicted probabilities checked against labeled outcomes (for example, a reliability curve or Brier score). This system does not produce calibrated answer probabilities.",
+    };
+    const label = (text, formula) => `<abbr class="metric-help" tabindex="0" title="${S.esc(formula)}">${text} ⓘ</abbr>`;
+    panel.innerHTML = `<div class="rag-comparison-heading"><div><h3>Retrieval strategy comparison</h3><p class="muted">Same question: “${S.esc(result.question)}”</p></div><button type="button" class="btn small ghost" id="closeModeComparison">Close</button></div>
+      <p class="rag-comparison-note">Retrieval is measured; answer generation is not repeated. Ranking scores are method-specific diagnostics, not confidence probabilities. Hover or focus ⓘ for metric definitions and formulas.</p>
+      <div class="rag-metrics-scroll"><table class="rag-metrics-table"><thead><tr><th>Strategy</th><th>${label("Latency", help.latency)}</th><th>${label("Passages", help.retrieved)}</th><th>${label("Top score", help.top)}</th><th>${label("Mean top-6", help.mean)}</th><th>${label("Source support", help.support)}</th><th>${label("Accuracy", help.accuracy)}</th><th>${label("Confidence", help.confidence)}</th></tr></thead><tbody>
+      ${result.modes.map((mode) => `<tr><th>${S.esc(modeShort(mode.mode))}</th><td>${Number(mode.retrieval_latency_ms).toFixed(2)} ms</td><td>${mode.retrieved_count}</td><td>${Number(mode.top_rank_score).toFixed(4)}</td><td>${Number(mode.mean_top_k_rank_score).toFixed(4)}</td><td>${mode.source_support_rate === null ? "Not rated" : `${(mode.source_support_rate * 100).toFixed(0)}%`}<small>${mode.source_support_votes} rating(s)</small></td><td>Not evaluated</td><td>Not calibrated</td></tr>`).join("")}
+      </tbody></table></div><div class="rag-compare-passages">${result.modes.map((mode) => `<details><summary>${S.esc(modeShort(mode.mode))}: top retrieved passages</summary>${mode.top_passages.slice(0, 3).map((passage, index) => `<p><strong>#${passage.chunk_index + 1} · rank ${index + 1} · ${Number(passage.rank_score).toFixed(4)}</strong><br>${S.esc(passage.excerpt)}</p>`).join("") || '<p class="muted">No passages.</p>'}</details>`).join("")}</div>`;
+    $("closeModeComparison").addEventListener("click", () => { panel.hidden = true; });
+  }
+
+  $("compareModes").addEventListener("click", () => run(compareModes));
+
+  $("chatMessages").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-interaction]");
+    if (!button || !state.active) return;
+    run(async () => {
+      button.disabled = true;
+      const interactionId = Number(button.dataset.interaction);
+      const supported = button.dataset.supported === "true";
+      await S.api(`/rag/${state.active.id}/interactions/${interactionId}/feedback`, {
+        method: "POST", body: { supported_by_sources: supported },
+      });
+      button.closest(".rag-feedback").outerHTML = feedbackHTML(interactionId, supported);
+      S.toast("Thanks — your source-support rating was saved.");
+      if (!$("modeComparison").hidden) await compareModes();
+    }).catch(() => { button.disabled = false; });
+  });
+
   $("chatForm").addEventListener("submit", (event) => {
     event.preventDefault();
     run(async () => {
@@ -416,6 +544,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
 
       removeTypingIndicator();
+      state.lastQuestion = question;
 
       const gapHTML = result.recall_gaps?.length
         ? `<p class="muted" style="font-size:12px;margin-top:6px">Recall compass considered: ${result.recall_gaps.map(S.esc).join(", ")}</p>`
@@ -434,6 +563,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <span class="rag-msg-tag">${S.esc(result.retrieval_method)}</span>
           ${result.mode === "grounded_ai" ? '<span class="rag-msg-tag">AI generated</span>' : '<span class="rag-msg-tag">Extracted</span>'}
         </div>
+        ${feedbackHTML(result.interaction_id, null)}
       `);
 
       state.chatHistory.push(
@@ -592,5 +722,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---------- Initialise ----------
   await run(async () => {
     await loadMaterials();
+    const student = await S.currentStudent();
+    state.studentId = student.id;
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(`ssr.rag.setup.${state.studentId}`) || "{}"); } catch (error) { /* Use defaults. */ }
+    if (["standard", "hybrid", "adaptive"].includes(saved.mode)) setMode(saved.mode);
+    if (saved.material_id && state.materials.some((material) => material.id === Number(saved.material_id))) {
+      $("materialSelect").value = String(saved.material_id);
+      await selectMaterial(Number(saved.material_id));
+    }
   });
 });

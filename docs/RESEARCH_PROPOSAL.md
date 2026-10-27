@@ -24,6 +24,19 @@ RecallMind combines (1) sequential prediction of a learner's next response, (2) 
 
 These are research directions, not established novelty or patent claims. Literature and patent review is required before asserting novelty.
 
+## Related work and claim boundary
+
+Sequential knowledge tracing and attention-based response prediction are established research directions. Deep Knowledge Tracing introduced recurrent neural models for learner interaction sequences; SAINT/SAINT+ use Transformer-style exercise and response streams, including temporal signals; AKT adds monotonic, time-aware attention and psychometric regularization. Consequently, this project should not present “using an LSTM/Transformer to predict a learner's next answer,” temporal decay, or combining a chatbot with a review policy as novel on their own. The candidate contribution must be framed around a clearly specified, task-matched evaluation of the end-to-end state-conditioned tutoring policy, if that evaluation later shows a reliable benefit.
+
+Primary references:
+
+- Piech et al. (2015), [Deep Knowledge Tracing](https://papers.nips.cc/paper_files/paper/2015/file/bac9162b47c56fc8a4d2a519803d51b3-Paper.pdf), NeurIPS.
+- Choi et al. (2020), [Towards an Appropriate Query, Key, and Value Computation for Knowledge Tracing (SAINT)](https://arxiv.org/abs/2002.07033), arXiv preprint.
+- Shin et al. (2020), [SAINT+: Integrating Temporal Features for EdNet Correctness Prediction](https://arxiv.org/abs/2010.12042), arXiv preprint.
+- Ghosh, Heffernan, and Lan (2020), [Context-Aware Attentive Knowledge Tracing (AKT)](https://doi.org/10.1145/3394486.3403282), KDD.
+
+This is a focused literature check, not a systematic review or a patentability opinion. The system still needs a broader, reproducible literature search and a separate patent search before making novelty claims.
+
 ## Scope and assumptions
 
 The available Duolingo trace supports interaction-sequence prediction but is not the same as student performance on uploaded course concepts. App quiz correctness is the relevant future source for app-domain models, but there is not yet a sufficiently documented export/training corpus. No labels for misconception classes, passage relevance, or delayed retention are assumed.

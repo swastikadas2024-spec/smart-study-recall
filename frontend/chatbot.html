@@ -4,11 +4,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Chat with uploaded study materials using standard, hybrid, or recall-aware retrieval." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="css/app.css?v=recall-aware-rag-1" />
-  <link rel="stylesheet" href="css/rag-chatbot.css?v=recall-aware-rag-1" />
+  <link rel="stylesheet" href="css/app.css?v=rag-chat-persistence-1" />
+  <link rel="stylesheet" href="css/rag-chatbot.css?v=rag-chat-persistence-1" />
   <script src="js/config.js"></script>
   <script src="js/api.js" defer></script>
-  <script src="js/rag-chatbot.js?v=recall-aware-rag-1" defer></script>
+  <script src="js/rag-chatbot.js?v=rag-chat-persistence-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -50,24 +50,13 @@
             </select>
           </div>
           <div class="rag-setup-field">
-            <label>RAG Mode</label>
-            <div class="rag-mode-switch" role="radiogroup" aria-label="RAG retrieval mode">
-              <button class="rag-mode-btn" data-mode="standard" type="button" role="radio" aria-checked="false">
-                <span class="rag-mode-icon">🔍</span>
-                <span class="rag-mode-label">Standard RAG</span>
-                <span class="rag-mode-desc">BM25 keyword search</span>
-              </button>
-              <button class="rag-mode-btn is-active" data-mode="hybrid" type="button" role="radio" aria-checked="true">
-                <span class="rag-mode-icon">⚡</span>
-                <span class="rag-mode-label">Hybrid RAG</span>
-                <span class="rag-mode-desc">BM25 + Semantic + RRF</span>
-              </button>
-              <button class="rag-mode-btn" data-mode="adaptive" type="button" role="radio" aria-checked="false">
-                <span class="rag-mode-icon">🎯</span>
-                <span class="rag-mode-label">Recall-aware</span>
-                <span class="rag-mode-desc">Hybrid retrieval + your quiz gaps and review recency</span>
-              </button>
-            </div>
+            <label for="ragMode">Retrieval strategy</label>
+            <select id="ragMode" class="rag-mode-select">
+              <option value="hybrid" selected>Hybrid · BM25 + TF-IDF</option>
+              <option value="standard">Standard · BM25 keywords</option>
+              <option value="adaptive">Recall-aware · hybrid + quiz history</option>
+            </select>
+            <p id="ragModeHelp" class="rag-mode-help">Recommended · combines keyword matches with TF-IDF similarity. The answer-generation provider is configured by the project administrator.</p>
           </div>
         </div>
         <div id="materialInfo" class="rag-material-info" hidden>
@@ -88,7 +77,9 @@
           <h3 id="archModeName"></h3>
           <span id="archModeTag" class="tag estimate"></span>
         </div>
+        <p class="rag-arch-caption">Illustrative flow of how a question moves through retrieval and answer generation. The animation explains the stages; it does not represent live processing.</p>
         <div id="pipelineFlow" class="rag-pipeline-flow"></div>
+        <p class="rag-arch-storage-note"><strong>Storage note:</strong> Material chunks are stored in PostgreSQL. Hybrid mode calculates TF-IDF similarity at query time; this app does not store dense embeddings in a vector database.</p>
         <div id="retrievalDetails" class="rag-retrieval-details"></div>
         <div id="archComparison" class="rag-comparison"></div>
       </div>
@@ -103,6 +94,7 @@
         </div>
         <div class="rag-chat-controls">
           <span id="ragModeIndicator" class="tag estimate"></span>
+          <button id="compareModes" class="btn small ghost" type="button">Compare strategies</button>
           <button id="showDiagnostics" class="btn small ghost" type="button">Show retrieval scores</button>
         </div>
       </div>
@@ -126,6 +118,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </form>
+        <section id="modeComparison" class="rag-mode-comparison" aria-live="polite" hidden></section>
       </div>
     </section>
 

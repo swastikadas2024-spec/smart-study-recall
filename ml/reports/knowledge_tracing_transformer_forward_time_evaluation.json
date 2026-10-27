@@ -1,5 +1,6 @@
 {
   "architecture": "transformer",
+  "optimizer": "adamw",
   "target": "next interaction session_correct / session_seen",
   "target_is_delayed_recall": false,
   "source_dataset": "Duolingo Learning Traces",
@@ -8,7 +9,7 @@
   "rows_scanned": 12854226,
   "examples": 119140,
   "learners": 1118,
-  "items_in_train_vocabulary": 7431,
+  "items_in_train_vocabulary": 7430,
   "oov_item_index": 1,
   "padding_index": 0,
   "sequence_length": 30,
@@ -19,10 +20,15 @@
     "previous_session_accuracy"
   ],
   "protocol": "forward_time",
+  "split_boundaries": {
+    "validation_start_timestamp": 1362754724.0,
+    "test_start_timestamp": 1362934842.0,
+    "rule": "event-count quantile cutoffs snapped to complete timestamp groups"
+  },
   "split_sizes": {
-    "train": 83398,
-    "validation": 17871,
-    "test": 17871
+    "train": 83383,
+    "validation": 17880,
+    "test": 17877
   },
   "split_learners": {
     "train": 863,
@@ -31,42 +37,59 @@
   },
   "seed": 42,
   "requested_max_epochs": 3,
-  "best_epoch": 2,
-  "best_validation_binomial_loss": 0.3005531132221222,
+  "best_epoch": 1,
+  "best_validation_binomial_loss": 0.3030346632003784,
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_weighted_binomial_loss": 0.3308511654436801,
+      "validation_weighted_binomial_loss": 0.3030346632003784
+    },
+    {
+      "epoch": 2,
+      "train_weighted_binomial_loss": 0.31862361701312264,
+      "validation_weighted_binomial_loss": 0.30368778109550476
+    },
+    {
+      "epoch": 3,
+      "train_weighted_binomial_loss": 0.3147545347087739,
+      "validation_weighted_binomial_loss": 0.30447641015052795
+    }
+  ],
   "device": "cpu",
   "selection": "early stopping on validation weighted binomial log loss; report metrics never select the checkpoint",
   "metrics": {
     "mean_baseline_test": {
-      "weighted_mae": 0.15255042139592942,
-      "weighted_rmse": 0.22664352279924616,
-      "weighted_binomial_log_loss": 0.3240976655607154,
-      "weighted_brier_score": 0.05136728642685241,
-      "weighted_ece_10_bins": 5.027968543069861e-06,
+      "weighted_mae": 0.15254598712427575,
+      "weighted_rmse": 0.22662724863175088,
+      "weighted_binomial_log_loss": 0.32405865616616875,
+      "weighted_brier_score": 0.05135990982239743,
+      "weighted_ece_10_bins": 3.198215672028937e-05,
       "weighted_roc_auc": 0.5
     },
     "random_forest_test": {
-      "weighted_mae": 0.1472531920780319,
-      "weighted_rmse": 0.22247906693269953,
-      "weighted_binomial_log_loss": 0.3171525917820494,
-      "weighted_brier_score": 0.049496935223244595,
-      "weighted_ece_10_bins": 0.011024500446325351,
-      "weighted_roc_auc": 0.5954123179640838
+      "weighted_mae": 0.14724043810848386,
+      "weighted_rmse": 0.22246242962235116,
+      "weighted_binomial_log_loss": 0.31703935127385674,
+      "weighted_brier_score": 0.04948953259347954,
+      "weighted_ece_10_bins": 0.010359005145142607,
+      "weighted_roc_auc": 0.5959328645183766
     },
     "deep_validation": {
-      "weighted_mae": 0.14463069924591782,
-      "weighted_rmse": 0.2193525207711263,
-      "weighted_binomial_log_loss": 0.30055308793115404,
-      "weighted_brier_score": 0.048115528368647395,
-      "weighted_ece_10_bins": 0.006666462913658416,
-      "weighted_roc_auc": 0.6112022925724023
+      "weighted_mae": 0.15414338965321922,
+      "weighted_rmse": 0.2203891623691374,
+      "weighted_binomial_log_loss": 0.3030346850341467,
+      "weighted_brier_score": 0.048571382889770004,
+      "weighted_ece_10_bins": 0.022455472103088434,
+      "weighted_roc_auc": 0.612054419993745
     },
     "deep_test": {
-      "weighted_mae": 0.14793476328076494,
-      "weighted_rmse": 0.22436981876494003,
-      "weighted_binomial_log_loss": 0.31893657163824773,
-      "weighted_brier_score": 0.05034181557261203,
-      "weighted_ece_10_bins": 0.004733466714128139,
-      "weighted_roc_auc": 0.5912636650254468
+      "weighted_mae": 0.15730611790675061,
+      "weighted_rmse": 0.22487532909463695,
+      "weighted_binomial_log_loss": 0.32028296000258916,
+      "weighted_brier_score": 0.05056891363542127,
+      "weighted_ece_10_bins": 0.015442367162830935,
+      "weighted_roc_auc": 0.5850822604307899
     }
   },
   "limitations": [
@@ -75,5 +98,5 @@
     "A single seed and deterministic learner sample are preliminary."
   ],
   "artifact": "ml/models/knowledge_tracer_transformer_forward_time.pt",
-  "artifact_sha256": "53cfac6c766c004a457450192a4b3819c0b257ca47beeb26e24cf26539f456c2"
+  "artifact_sha256": "5a4c20867c5c18df234597bd7965335294037f0f461b10d15bad0c800e174472"
 }

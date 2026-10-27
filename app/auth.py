@@ -5,12 +5,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import httpx
+import logging
 
 from app.config import settings
 from app.database import get_db
 from app.models import Profile
 
 bearer_scheme = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 def get_current_student(
@@ -56,10 +58,30 @@ def get_current_student(
 
     except HTTPException:
         raise
-    except httpx.HTTPError as exc:
+    except httpx.TimeoutException as exc:
+        logger.warning("Supabase Auth verification timed out: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail="Could not verify Supabase authentication.",
+            detail="Supabase Auth verification timed out. Check backend internet access and whether the Supabase project is active.",
+        ) from exc
+    except httpx.ConnectError as exc:
+        logger.warning("Could not connect to Supabase Auth: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="The backend cannot connect to Supabase Auth. Check its internet/proxy access, Supabase project URL, and project status.",
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        logger.warning("Supabase Auth returned HTTP %s during token verification.", status)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Supabase Auth returned HTTP {status}. Check the Supabase project status and backend Supabase configuration.",
+        ) from exc
+    except httpx.HTTPError as exc:
+        logger.warning("Supabase Auth verification failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Supabase Auth verification failed ({type(exc).__name__}). Check backend connectivity and Supabase project status.",
         ) from exc
 
     supabase_user_id = user.get("id")

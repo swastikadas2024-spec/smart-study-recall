@@ -64,7 +64,7 @@ class KnowledgeTracingRequest(BaseModel):
     target_history_seen: int = Field(ge=0, le=100000)
     target_history_correct: int = Field(ge=0, le=100000)
     elapsed_days: float = Field(ge=0, le=3650, allow_inf_nan=False)
-    architecture: Literal["lstm", "transformer"] = "lstm"
+    architecture: Literal["mlp", "lstm", "transformer"] = "lstm"
 
 
 @app.post("/predict/knowledge-tracing")

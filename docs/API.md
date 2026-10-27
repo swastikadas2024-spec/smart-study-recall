@@ -11,6 +11,7 @@ See `/docs` on a running backend for the complete OpenAPI schema. Main route gro
 - `/learning-events`
 - `/revision-schedules`
 - `/recommendations/{student_id}` and `/dashboard/{student_id}`
+- `POST /recommendations/{student_id}/auto-schedule` creates one pending review per eligible topic using the trained next-session score threshold policy; it skips topics with an existing pending review or without supported model output.
 - `/topic-recall/{topic_id}`
 - `/materials` and material notes/quiz/chat
 - `/rag/architecture`, `/rag/{material_id}/architecture`, and RAG chat/quiz/notes routes
@@ -23,6 +24,6 @@ RAG material chat accepts a question, mode (`standard`, `hybrid`, or `adaptive`)
 
 ## ML knowledge-tracing endpoint
 
-`POST http://127.0.0.1:8000/predict/knowledge-tracing` accepts up to 500 timestamp-ordered interactions, a target item ID, pre-event history counts, elapsed days, and an architecture (`lstm` or `transformer`). The endpoint requires the corresponding trained artifact and otherwise returns 503. It returns an experimental next-interaction correct fraction, OOV status and explicit limitations. The local ML service is not mounted through the authenticated app API because the Duolingo item vocabulary does not map to app course topics. Do not use this score as a course-topic forgetting probability.
+`POST http://127.0.0.1:8000/predict/knowledge-tracing` accepts up to 500 timestamp-ordered interactions, a target item ID, pre-event history counts, elapsed days, and an architecture (`mlp`, `lstm` or `transformer`). The endpoint requires the corresponding trained forward-time artifact and otherwise returns 503. It returns an experimental next-interaction correct fraction, OOV status and explicit limitations. The local ML service is not mounted through the authenticated app API because the Duolingo item vocabulary does not map to app course topics. Do not use this score as a course-topic forgetting probability.
 
 All request examples and validation constraints are defined by the Pydantic models in `app/routers` and `ml/src/api.py`.

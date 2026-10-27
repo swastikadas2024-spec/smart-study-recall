@@ -124,7 +124,7 @@ def build_sequences(
 
 @dataclass
 class SequenceKnowledgeTracer:
-    """Factory for a CPU/GPU-compatible LSTM or Transformer predictor."""
+    """Factory for a tabular MLP, LSTM, or Transformer predictor."""
 
     item_count: int
     architecture: str = "lstm"
@@ -137,8 +137,8 @@ class SequenceKnowledgeTracer:
         import torch
         from torch import nn
 
-        if self.architecture not in {"lstm", "transformer"}:
-            raise ValueError("architecture must be 'lstm' or 'transformer'")
+        if self.architecture not in {"mlp", "lstm", "transformer"}:
+            raise ValueError("architecture must be 'mlp', 'lstm', or 'transformer'")
 
         class Network(nn.Module):
             def __init__(inner_self):
@@ -149,7 +149,19 @@ class SequenceKnowledgeTracer:
                     nn.LayerNorm(self.hidden_size),
                     nn.GELU(),
                 )
-                if self.architecture == "lstm":
+                if self.architecture == "mlp":
+                    # Order-agnostic history summary is a feedforward baseline;
+                    # the current event representation is kept separately.
+                    inner_self.head = nn.Sequential(
+                        nn.Linear(self.hidden_size * 2, self.hidden_size),
+                        nn.GELU(),
+                        nn.Dropout(self.dropout),
+                        nn.Linear(self.hidden_size, 32),
+                        nn.GELU(),
+                        nn.Dropout(self.dropout),
+                        nn.Linear(32, 1),
+                    )
+                elif self.architecture == "lstm":
                     inner_self.encoder = nn.LSTM(
                         self.hidden_size,
                         self.hidden_size,
@@ -169,12 +181,13 @@ class SequenceKnowledgeTracer:
                     inner_self.encoder = nn.TransformerEncoder(layer, num_layers=2)
                     inner_self.position_embedding = nn.Embedding(self.sequence_length, self.hidden_size)
                 inner_self.dropout = nn.Dropout(self.dropout)
-                inner_self.head = nn.Sequential(
-                    nn.Linear(self.hidden_size, 32),
-                    nn.GELU(),
-                    nn.Dropout(self.dropout),
-                    nn.Linear(32, 1),
-                )
+                if self.architecture != "mlp":
+                    inner_self.head = nn.Sequential(
+                        nn.Linear(self.hidden_size, 32),
+                        nn.GELU(),
+                        nn.Dropout(self.dropout),
+                        nn.Linear(32, 1),
+                    )
 
             def forward(inner_self, x, lengths):
                 item = x[:, :, 0].long()
@@ -184,6 +197,12 @@ class SequenceKnowledgeTracer:
                 )
                 positions = torch.arange(x.shape[1], device=x.device).unsqueeze(0)
                 padding = positions >= lengths.unsqueeze(1)
+                if self.architecture == "mlp":
+                    valid = (~padding).unsqueeze(-1).to(encoded.dtype)
+                    mean_context = (encoded * valid).sum(dim=1) / lengths.unsqueeze(1).clamp_min(1)
+                    current = encoded[torch.arange(len(lengths), device=x.device), lengths - 1]
+                    summary = torch.cat((current, mean_context), dim=-1)
+                    return torch.sigmoid(inner_self.head(inner_self.dropout(summary)).squeeze(-1))
                 if self.architecture == "transformer":
                     encoded = encoded + inner_self.position_embedding(positions)
                     causal = torch.triu(

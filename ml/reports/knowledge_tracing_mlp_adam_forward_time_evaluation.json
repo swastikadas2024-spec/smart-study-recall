@@ -1,0 +1,102 @@
+{
+  "architecture": "mlp",
+  "optimizer": "adam",
+  "target": "next interaction session_correct / session_seen",
+  "target_is_delayed_recall": false,
+  "source_dataset": "Duolingo Learning Traces",
+  "sample_modulus": 100,
+  "hash_key": "smartstudyrecall",
+  "rows_scanned": 12854226,
+  "examples": 119140,
+  "learners": 1118,
+  "items_in_train_vocabulary": 7430,
+  "oov_item_index": 1,
+  "padding_index": 0,
+  "sequence_length": 30,
+  "numeric_features": [
+    "log_history_seen",
+    "history_accuracy",
+    "log_gap_days",
+    "previous_session_accuracy"
+  ],
+  "protocol": "forward_time",
+  "split_boundaries": {
+    "validation_start_timestamp": 1362754724.0,
+    "test_start_timestamp": 1362934842.0,
+    "rule": "event-count quantile cutoffs snapped to complete timestamp groups"
+  },
+  "split_sizes": {
+    "train": 83383,
+    "validation": 17880,
+    "test": 17877
+  },
+  "split_learners": {
+    "train": 863,
+    "validation": 314,
+    "test": 344
+  },
+  "seed": 42,
+  "requested_max_epochs": 3,
+  "best_epoch": 3,
+  "best_validation_binomial_loss": 0.2990715801715851,
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_weighted_binomial_loss": 0.34242168729011185,
+      "validation_weighted_binomial_loss": 0.30114084482192993
+    },
+    {
+      "epoch": 2,
+      "train_weighted_binomial_loss": 0.3209116767655094,
+      "validation_weighted_binomial_loss": 0.29919925332069397
+    },
+    {
+      "epoch": 3,
+      "train_weighted_binomial_loss": 0.3184578282914843,
+      "validation_weighted_binomial_loss": 0.2990715801715851
+    }
+  ],
+  "device": "cpu",
+  "selection": "early stopping on validation weighted binomial log loss; report metrics never select the checkpoint",
+  "metrics": {
+    "mean_baseline_test": {
+      "weighted_mae": 0.15254598712427575,
+      "weighted_rmse": 0.22662724863175088,
+      "weighted_binomial_log_loss": 0.32405865616616875,
+      "weighted_brier_score": 0.05135990982239743,
+      "weighted_ece_10_bins": 3.198215672028937e-05,
+      "weighted_roc_auc": 0.5
+    },
+    "random_forest_test": {
+      "weighted_mae": 0.14724043810848386,
+      "weighted_rmse": 0.22246242962235116,
+      "weighted_binomial_log_loss": 0.31703935127385674,
+      "weighted_brier_score": 0.04948953259347954,
+      "weighted_ece_10_bins": 0.010359005145142604,
+      "weighted_roc_auc": 0.5959328645183766
+    },
+    "deep_validation": {
+      "weighted_mae": 0.13433855835926264,
+      "weighted_rmse": 0.21895511184500144,
+      "weighted_binomial_log_loss": 0.2990715818322364,
+      "weighted_brier_score": 0.047941341003057095,
+      "weighted_ece_10_bins": 0.01068160933522782,
+      "weighted_roc_auc": 0.6272149785170791
+    },
+    "deep_test": {
+      "weighted_mae": 0.13943256600371148,
+      "weighted_rmse": 0.22499146553232044,
+      "weighted_binomial_log_loss": 0.3210334452760072,
+      "weighted_brier_score": 0.05062115956238134,
+      "weighted_ece_10_bins": 0.01677726301133052,
+      "weighted_roc_auc": 0.5914187693507278
+    }
+  },
+  "limitations": [
+    "This aggregated next-interaction target is not delayed retention.",
+    "Duolingo lexeme IDs do not map to app course topics or uploaded materials.",
+    "A single seed and deterministic learner sample are preliminary."
+  ],
+  "artifact": "ml/models/knowledge_tracer_mlp_adam_forward_time.pt",
+  "artifact_sha256": "57886d25de31e12e65da243f07f21d4b5383adf09e94322ada0bd5a0facfc73c"
+}

@@ -1,5 +1,6 @@
 {
   "architecture": "lstm",
+  "optimizer": "adamw",
   "target": "next interaction session_correct / session_seen",
   "target_is_delayed_recall": false,
   "source_dataset": "Duolingo Learning Traces",
@@ -8,7 +9,7 @@
   "rows_scanned": 12854226,
   "examples": 119140,
   "learners": 1118,
-  "items_in_train_vocabulary": 7431,
+  "items_in_train_vocabulary": 7430,
   "oov_item_index": 1,
   "padding_index": 0,
   "sequence_length": 30,
@@ -19,10 +20,15 @@
     "previous_session_accuracy"
   ],
   "protocol": "forward_time",
+  "split_boundaries": {
+    "validation_start_timestamp": 1362754724.0,
+    "test_start_timestamp": 1362934842.0,
+    "rule": "event-count quantile cutoffs snapped to complete timestamp groups"
+  },
   "split_sizes": {
-    "train": 83398,
-    "validation": 17871,
-    "test": 17871
+    "train": 83383,
+    "validation": 17880,
+    "test": 17877
   },
   "split_learners": {
     "train": 863,
@@ -32,41 +38,58 @@
   "seed": 42,
   "requested_max_epochs": 3,
   "best_epoch": 3,
-  "best_validation_binomial_loss": 0.3012331426143646,
+  "best_validation_binomial_loss": 0.2994807958602905,
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_weighted_binomial_loss": 0.3404104686863703,
+      "validation_weighted_binomial_loss": 0.3029846251010895
+    },
+    {
+      "epoch": 2,
+      "train_weighted_binomial_loss": 0.31875821737340193,
+      "validation_weighted_binomial_loss": 0.29970523715019226
+    },
+    {
+      "epoch": 3,
+      "train_weighted_binomial_loss": 0.31509481024117497,
+      "validation_weighted_binomial_loss": 0.2994807958602905
+    }
+  ],
   "device": "cpu",
   "selection": "early stopping on validation weighted binomial log loss; report metrics never select the checkpoint",
   "metrics": {
     "mean_baseline_test": {
-      "weighted_mae": 0.15255042139592942,
-      "weighted_rmse": 0.22664352279924616,
-      "weighted_binomial_log_loss": 0.3240976655607154,
-      "weighted_brier_score": 0.05136728642685241,
-      "weighted_ece_10_bins": 5.027968543069861e-06,
+      "weighted_mae": 0.15254598712427575,
+      "weighted_rmse": 0.22662724863175088,
+      "weighted_binomial_log_loss": 0.32405865616616875,
+      "weighted_brier_score": 0.05135990982239743,
+      "weighted_ece_10_bins": 3.198215672028937e-05,
       "weighted_roc_auc": 0.5
     },
     "random_forest_test": {
-      "weighted_mae": 0.1472531920780319,
-      "weighted_rmse": 0.22247906693269953,
-      "weighted_binomial_log_loss": 0.3171525917820494,
-      "weighted_brier_score": 0.049496935223244595,
-      "weighted_ece_10_bins": 0.011024500446325351,
-      "weighted_roc_auc": 0.5954123179640838
+      "weighted_mae": 0.14724043810848386,
+      "weighted_rmse": 0.22246242962235116,
+      "weighted_binomial_log_loss": 0.31703935127385674,
+      "weighted_brier_score": 0.04948953259347954,
+      "weighted_ece_10_bins": 0.010359005145142604,
+      "weighted_roc_auc": 0.5959328645183766
     },
     "deep_validation": {
-      "weighted_mae": 0.1453309925453153,
-      "weighted_rmse": 0.21997406013337942,
-      "weighted_binomial_log_loss": 0.3012331454851019,
-      "weighted_brier_score": 0.048388587131563625,
-      "weighted_ece_10_bins": 0.012276539624521982,
-      "weighted_roc_auc": 0.6175104427850528
+      "weighted_mae": 0.14310677114983303,
+      "weighted_rmse": 0.21894226396794964,
+      "weighted_binomial_log_loss": 0.29948079493964946,
+      "weighted_brier_score": 0.04793571495141134,
+      "weighted_ece_10_bins": 0.007699226225633538,
+      "weighted_roc_auc": 0.6201534620440424
     },
     "deep_test": {
-      "weighted_mae": 0.14853043503488436,
-      "weighted_rmse": 0.2253784082856746,
-      "weighted_binomial_log_loss": 0.32107902130935057,
-      "weighted_brier_score": 0.05079542692138423,
-      "weighted_ece_10_bins": 0.016010099280071844,
-      "weighted_roc_auc": 0.5860594506523814
+      "weighted_mae": 0.14675270729183454,
+      "weighted_rmse": 0.22463818916394507,
+      "weighted_binomial_log_loss": 0.3194980063373232,
+      "weighted_brier_score": 0.05046231603085637,
+      "weighted_ece_10_bins": 0.01075218919368846,
+      "weighted_roc_auc": 0.5926654629419784
     }
   },
   "limitations": [
@@ -75,5 +98,5 @@
     "A single seed and deterministic learner sample are preliminary."
   ],
   "artifact": "ml/models/knowledge_tracer_lstm_forward_time.pt",
-  "artifact_sha256": "44afde02484ce92e638157ec4706070022a5fc5ae35eb2afcc3794841fa00c3a"
+  "artifact_sha256": "602a0ca0c11d668442ece82314567ef42948cf36ef4629216164a786c912674c"
 }

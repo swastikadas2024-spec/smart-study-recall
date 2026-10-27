@@ -3,13 +3,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23dafa9c%27/%3E%3Cpath d=%27M6 4h12v16H6z%27 fill=%27%230f0f0f%27/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="css/app.css?v=manual-study-hours-1" />
+  <link rel="stylesheet" href="css/app.css?v=study-workflow-mcq-1" />
   <script src="js/config.js"></script>
   <script src="js/api.js" defer></script>
   <script src="js/model.js" defer></script>
   <script src="js/local.js" defer></script>
   <script src="js/effects.js" defer></script>
-  <script src="js/study.js?v=manual-study-hours-1" defer></script>
+  <script src="js/study.js?v=study-workflow-mcq-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -19,7 +19,7 @@
       <a href="dashboard.html">Dashboard</a>
       <a href="topics.html">Topics</a>
       <a href="materials.html">Materials</a>
-      <a href="study.html">Study</a>
+      <a href="study.html" aria-current="page">Study</a>
       <a href="chatbot.html">RAG Chatbot</a>
       <a href="planner.html">Planner</a>
       <a href="progress.html">Progress</a>
@@ -36,6 +36,13 @@
       <p class="page-lede">Use the countdown while you study, or log hours afterward. Quiz results update your topic recall data.</p>
     </section>
     <p id="pageError" class="notice warn" role="alert" hidden></p>
+
+    <nav class="study-shortcuts" aria-label="Study shortcuts">
+      <a class="study-shortcut" href="topics.html#topicList"><span>01</span><strong>Add topics &amp; flashcards</strong></a>
+      <a class="study-shortcut is-current" href="#quiz"><span>02</span><strong>Take an MCQ quiz</strong></a>
+      <a class="study-shortcut" href="dashboard.html"><span>03</span><strong>See your forecast</strong></a>
+      <a class="study-shortcut" href="planner.html"><span>04</span><strong>Plan a review</strong></a>
+    </nav>
 
     <section class="section" aria-labelledby="timerTitle">
       <div class="section-head">
@@ -106,14 +113,16 @@
     <section class="section" id="quiz" aria-labelledby="quizTitle">
       <div class="section-head">
         <h2 id="quizTitle" class="display">Recall quiz</h2>
-        <span class="muted">Built from your flashcards. Results are saved to your account.</span>
+        <span class="muted">One answer per question. Results are saved as model inputs.</span>
       </div>
 
       <div class="panel" id="quizSetup">
-        <p id="quizHint" class="muted" hidden>Add a flashcard to a topic first. Open <a href="topics.html">Topics</a> and choose Add card.</p>
+        <p id="quizHint" class="notice warn" hidden>Add flashcards to at least two topics to build a multiple-choice quiz. <a href="topics.html#topicList">Go to Topics and add flashcards</a>.</p>
+        <p id="quizAvailability" class="muted quiz-availability"></p>
         <div class="form-grid" style="margin-top:4px">
           <label>Questions
             <select id="quizCount">
+              <option value="2">2</option>
               <option value="3">3</option>
               <option value="5" selected>5</option>
               <option value="8">8</option>
@@ -121,10 +130,10 @@
             </select>
           </label>
           <div class="form-actions" style="align-items:flex-end">
-            <button id="quizStart" class="btn primary" type="button">Generate quiz</button>
+            <button id="quizStart" class="btn primary" type="button" disabled>Generate MCQ quiz</button>
           </div>
         </div>
-        <p class="muted" style="margin-top:14px">Topics you are least likely to remember are asked first. With three or more cards you get multiple choice. With fewer, you fill in the blank and grade yourself.</p>
+        <p class="muted" style="margin-top:14px">Questions start with topics that have the lowest estimated recall. Pick an answer to see immediate feedback.</p>
       </div>
 
       <div class="panel quiz-stage" id="quizStage" hidden>
@@ -132,19 +141,11 @@
           <span id="quizProgress" class="muted"></span>
           <span class="tag" id="quizMode"></span>
         </div>
+        <div class="quiz-progress-track" role="progressbar" aria-label="Quiz progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="quizProgressFill"></span></div>
         <p id="quizPrompt" class="quiz-prompt"></p>
         <div id="quizChoices" class="choices"></div>
-        <div id="quizReveal" class="answer-box" hidden><p id="quizAnswer"></p></div>
         <div class="form-actions">
           <button id="quizAction" class="btn primary" type="button" hidden></button>
-        </div>
-        <div id="quizGrade" hidden>
-          <p class="muted" style="margin-bottom:10px">How much did you recall?</p>
-          <div class="grade-buttons" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
-            <button class="btn good" data-score="1" type="button">Fully</button>
-            <button class="btn warn" data-score="0.5" type="button">Partly</button>
-            <button class="btn bad" data-score="0" type="button">Forgot</button>
-          </div>
         </div>
         <p id="quizFeedback" class="muted"></p>
       </div>
@@ -154,9 +155,11 @@
         <p id="quizScore" class="score-big"></p>
         <ul id="quizBreakdown" class="rows"></ul>
         <p id="quizSaveNote" class="muted"></p>
+        <div id="quizModelImpact" class="quiz-model-impact" hidden></div>
         <div class="form-actions">
           <button id="quizRetry" class="btn" type="button" hidden>Save again</button>
           <button id="quizAgain" class="btn primary" type="button">New quiz</button>
+          <a id="quizDashboardLink" class="btn ghost" href="dashboard.html" hidden>View updated forecast</a>
         </div>
       </div>
     </section>

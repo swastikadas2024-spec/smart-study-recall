@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "ml" / "src"))
 
 from knowledge_tracing import SequenceKnowledgeTracer, build_sequences  # noqa: E402
+from train_knowledge_tracer import make_splits, train_deep  # noqa: E402
 
 
 class KnowledgeTracingSequenceTests(unittest.TestCase):
@@ -43,7 +44,7 @@ class KnowledgeTracingSequenceTests(unittest.TestCase):
         base[1, 0, 0] = 2
         x = torch.from_numpy(base)
         lengths = torch.tensor([3, 1])
-        for architecture in ("lstm", "transformer"):
+        for architecture in ("mlp", "lstm", "transformer"):
             model = SequenceKnowledgeTracer(
                 item_count=4, architecture=architecture, sequence_length=4
             ).build().eval()
@@ -60,6 +61,38 @@ class KnowledgeTracingSequenceTests(unittest.TestCase):
     def test_input_contract_rejects_missing_fields(self):
         with self.assertRaisesRegex(ValueError, "Missing interaction fields"):
             build_sequences(pd.DataFrame([{"user_id": "a"}]), {}, sequence_length=2)
+
+    def test_mlp_training_returns_train_and_validation_history(self):
+        rng = np.random.default_rng(7)
+        windows = np.zeros((8, 3, 5), dtype=np.float32)
+        lengths = np.array([1, 2, 3, 1, 2, 3, 1, 2], dtype=np.int64)
+        for row, length in enumerate(lengths):
+            windows[row, :length, 0] = 2
+            windows[row, :length, 1:] = rng.normal(size=(length, 4))
+        labels = np.array([1, 0, 1, 0, 1, 0, 1, 0], dtype=np.float32)
+        seen = np.ones(8, dtype=np.float32)
+        model, scaler, best_epoch, best_loss, history = train_deep(
+            "mlp", windows[:6], lengths[:6], labels[:6], seen[:6],
+            windows[6:], lengths[6:], labels[6:], seen[6:],
+            seed=11, max_epochs=2, batch_size=3, item_count=4,
+            device=torch.device("cpu"), optimizer_name="adamw",
+        )
+        self.assertIn(best_epoch, [entry["epoch"] for entry in history])
+        self.assertTrue(np.isfinite(best_loss))
+        self.assertTrue(np.isfinite(history[0]["train_weighted_binomial_loss"]))
+        self.assertTrue(np.isfinite(history[0]["validation_weighted_binomial_loss"]))
+        self.assertIsNotNone(scaler)
+        self.assertIsNotNone(model)
+
+    def test_forward_time_split_keeps_equal_timestamps_together(self):
+        frame = pd.DataFrame({"timestamp": np.repeat(np.arange(10), [2, 2, 2, 2, 2, 2, 2, 2, 2, 2])})
+        splits = make_splits(frame, "forward_time", seed=42)
+        assigned = {}
+        for split_name, indexes in zip(("train", "validation", "test"), splits):
+            for timestamp in frame.timestamp.iloc[indexes].unique():
+                self.assertNotIn(timestamp, assigned)
+                assigned[timestamp] = split_name
+        self.assertEqual(len(assigned), frame.timestamp.nunique())
 
 
 if __name__ == "__main__":

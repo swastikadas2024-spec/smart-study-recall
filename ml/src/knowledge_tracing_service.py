@@ -16,8 +16,8 @@ MODEL_DIR = Path(__file__).resolve().parent.parent / "models"
 
 @lru_cache(maxsize=1)
 def _load_model(architecture: str):
-    if architecture not in {"lstm", "transformer"}:
-        raise ValueError("architecture must be 'lstm' or 'transformer'")
+    if architecture not in {"mlp", "lstm", "transformer"}:
+        raise ValueError("architecture must be 'mlp', 'lstm', or 'transformer'")
     path = MODEL_DIR / f"knowledge_tracer_{architecture}_forward_time.pt"
     if not path.exists():
         raise FileNotFoundError("Train ml/src/train_knowledge_tracer.py before requesting KT predictions.")

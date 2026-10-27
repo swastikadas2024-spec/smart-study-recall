@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let topics = [];
   let revs = [];
   let recs = [];
+  let autoScheduleMessage = "";
   let viewMonth = new Date();
   viewMonth.setDate(1);
   viewMonth.setHours(0, 0, 0, 0);
@@ -142,6 +143,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function render() {
     const names = Object.fromEntries(topics.map((t) => [t.id, t.topic_name]));
     const now = Date.now();
+    const pendingByTopic = new Map(revs.filter((r) => !r.completed).map((r) => [r.topic_id, r]));
 
     $("revTopic").innerHTML = topics.map((t) => `<option value="${t.id}">${esc(t.topic_name)}</option>`).join("");
     $("revTopic").disabled = topics.length === 0;
@@ -152,17 +154,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       $("revAt").value = S.toLocalInput(tomorrow);
     }
 
+    $("autoScheduleStatus").hidden = !autoScheduleMessage;
+    $("autoScheduleStatus").textContent = autoScheduleMessage;
     $("suggestions").innerHTML = recs.recommendations.length
-      ? recs.recommendations.map((r) => `<li class="row">
-          <div><strong>${esc(r.topic_name)}</strong><span class="muted">${esc(r.reason)} ${esc(r.suggested_action)}</span>
-            ${r.next_session_prediction?.available
-              ? `<span class="muted">Model policy: review in ${esc(r.next_session_prediction.recommended_review_in_days)} days · expected next-session score ${S.pct(r.next_session_prediction.recommended_predicted_score * 100)}</span>`
-              : `<span class="muted">${esc(r.next_session_prediction?.reason || "Rule-based schedule will be used if the model is unavailable.")}</span>`}</div>
-          <div class="row-actions">
-            <span class="pill ${priorityClass(r.priority)}">${esc(r.priority)}</span>
-            <button class="btn small primary" type="button" data-action="schedule" data-topic="${r.topic_id}">Schedule review</button>
-          </div>
-        </li>`).join("")
+      ? recs.recommendations.map((r) => {
+          const prediction = r.next_session_prediction;
+          const pendingReview = pendingByTopic.get(r.topic_id);
+          const forecastText = prediction?.available
+            ? `Forgetting curve: ${prediction.predicted_forgetting_at ? `estimated 80% crossing ${S.fmtDateTime(prediction.predicted_forgetting_at)}` : "80% crossing is beyond the model horizon"}. Suggested review in ${prediction.recommended_review_in_days} day(s), with ${S.pct(prediction.recommended_predicted_score * 100)} predicted next-session score.`
+            : `Automatic model schedule unavailable: ${prediction?.reason || "log a study session to get a forecast"}`;
+          return `<li class="row">
+            <div><strong>${esc(r.topic_name)}</strong><span class="muted">${esc(r.reason)} ${esc(r.suggested_action)}</span>
+              <span class="muted">${esc(forecastText)}</span>
+              ${pendingReview ? `<span class="muted">Scheduled for ${esc(S.fmtDateTime(pendingReview.scheduled_at))}.</span>` : ""}
+            </div>
+            <div class="row-actions">
+              <span class="pill ${priorityClass(r.priority)}">${esc(r.priority)}</span>
+              ${pendingReview ? '<span class="tag">Scheduled</span>' : `<button class="btn small primary" type="button" data-action="schedule" data-topic="${r.topic_id}">Schedule fallback</button>`}
+            </div>
+          </li>`;
+        }).join("")
       : `<li class="empty-line">Add topics and log sessions to get suggestions.</li>`;
 
     const pending = revs.filter((r) => !r.completed).sort(byTime);
@@ -195,11 +206,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function load() {
     me = await S.currentStudent();
-    [topics, revs, recs] = await Promise.all([
+    [topics, revs] = await Promise.all([
       S.api("/topics"),
       S.api(`/revision-schedules?student_id=${me.id}`),
-      S.api(`/recommendations/${me.id}`),
     ]);
+    try {
+      const automatic = await S.api(`/recommendations/${me.id}/auto-schedule`, { method: "POST" });
+      recs = { recommendations: automatic.recommendations || [] };
+      revs = [...revs, ...(automatic.created || [])];
+      autoScheduleMessage = automatic.created_count
+        ? `The recall model automatically scheduled ${automatic.created_count} review${automatic.created_count === 1 ? "" : "s"} at the 80% review threshold. Forecasts are experimental next-session estimates.`
+        : `Automatic scheduling checked your model forecasts. ${automatic.skipped?.length || 0} topic(s) already have a review, need a new study log, or lack a supported model forecast.`;
+    } catch (error) {
+      [recs] = await Promise.all([S.api(`/recommendations/${me.id}`)]);
+      autoScheduleMessage = `Automatic model scheduling is unavailable right now. ${error.message}`;
+    }
     render();
   }
 

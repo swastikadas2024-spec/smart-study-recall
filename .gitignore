@@ -16,3 +16,5 @@ __pycache__/
 .vscode/
 ml/data/raw/
 ml/data/processed/
+ml/models/knowledge_tracer_mlp_*_forward_time.pt
+ml/models/knowledge_tracer_mlp_learner_held_out.pt

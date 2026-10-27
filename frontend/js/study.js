@@ -196,21 +196,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return a;
   };
 
-  // Blank the longest word of the answer for fill-in-the-blank questions.
-  function clozeOf(answer) {
-    const words = answer.split(/\s+/);
-    let best = 0;
-    words.forEach((w, i) => {
-      if (w.replace(/[^A-Za-z]/g, "").length > words[best].replace(/[^A-Za-z]/g, "").length) best = i;
-    });
-    return words.map((w, i) => (i === best ? "_____" : w)).join(" ");
-  }
-
   function buildQuiz(count) {
     const cards = L.cards(me.id);
     const withCards = topics.filter((t) => cards[String(t.id)]);
-    if (!withCards.length) return null;
-    const useChoice = withCards.length >= 3;
+    const answerBank = [...new Set(withCards.map((t) => String(cards[String(t.id)].answer || "").trim()).filter(Boolean))];
+    if (withCards.length < 2 || answerBank.length < 2) return null;
     const ordered = withCards
       .map((t) => {
         const f = M.forecast(events.filter((e) => e.topic_id === t.id));
@@ -222,18 +212,44 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     return ordered.map((t) => {
       const card = cards[String(t.id)];
-      if (!useChoice) return { topic: t, type: "cloze", prompt: clozeOf(card.answer), answer: card.answer };
-      const others = shuffle([...new Set(withCards.filter((x) => x.id !== t.id).map((x) => cards[String(x.id)].answer))]).slice(0, 3);
-      const options = shuffle([card.answer, ...others]);
+      const answer = String(card.answer).trim();
+      const others = shuffle(answerBank.filter((option) => option !== answer)).slice(0, 3);
+      const options = shuffle([answer, ...others]);
       return {
         topic: t,
         type: "choice",
         prompt: card.question,
-        answer: card.answer,
+        answer,
         options,
-        correct: options.indexOf(card.answer),
+        correct: options.indexOf(answer),
       };
     });
+  }
+
+  function refreshQuizAvailability() {
+    const cards = L.cards(me.id);
+    const available = topics.filter((t) => cards[String(t.id)] && String(cards[String(t.id)].answer || "").trim());
+    const uniqueAnswers = new Set(available.map((t) => String(cards[String(t.id)].answer).trim()));
+    const canBuild = available.length >= 2 && uniqueAnswers.size >= 2;
+    Array.from($("quizCount").options).forEach((option) => {
+      option.hidden = !canBuild || Number(option.value) > available.length;
+      option.disabled = option.hidden;
+    });
+    if (canBuild) {
+      const allowed = Array.from($("quizCount").options).filter((option) => !option.disabled);
+      if (!allowed.some((option) => option.value === $("quizCount").value)) {
+        $("quizCount").value = allowed[allowed.length - 1].value;
+      }
+      $("quizStart").disabled = false;
+      $("quizHint").hidden = true;
+      $("quizAvailability").textContent = `${available.length} flashcards ready · up to 4 answer choices per question · quiz results feed the next-session forecast.`;
+    } else {
+      $("quizStart").disabled = true;
+      $("quizHint").hidden = false;
+      $("quizAvailability").textContent = available.length
+        ? "Add a flashcard with a different answer so the quiz can offer a real distractor."
+        : "No flashcards yet. Add question-and-answer cards to at least two topics to start.";
+    }
   }
 
   function recordResult(topic, fullyCorrect) {
@@ -252,27 +268,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderQuestion() {
     const q = quiz.items[quiz.index];
     $("quizChoices").replaceChildren();
-    $("quizReveal").hidden = true;
-    $("quizGrade").hidden = true;
     $("quizAction").hidden = true;
     $("quizFeedback").textContent = "";
-    $("quizMode").textContent = q.type === "choice" ? "Multiple choice" : "Fill in the blank";
+    $("quizMode").textContent = "Multiple choice";
     $("quizProgress").textContent = `Question ${quiz.index + 1} of ${quiz.items.length} · ${q.topic.topic_name}`;
+    const progress = Math.round((quiz.index / quiz.items.length) * 100);
+    $("quizProgressFill").style.width = `${progress}%`;
+    $("quizStage").querySelector("[role=progressbar]").setAttribute("aria-valuenow", String(progress));
     $("quizPrompt").textContent = q.prompt;
 
-    if (q.type === "choice") {
-      q.options.forEach((opt, i) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "btn choice";
-        b.textContent = opt;
-        b.addEventListener("click", () => chooseOption(i));
-        $("quizChoices").append(b);
-      });
-    } else {
-      $("quizAction").hidden = false;
-      $("quizAction").textContent = "Reveal answer";
-    }
+    q.options.forEach((opt, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn choice";
+      b.textContent = opt;
+      b.addEventListener("click", () => chooseOption(i));
+      $("quizChoices").append(b);
+    });
   }
 
   function chooseOption(i) {
@@ -284,16 +296,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!right) buttons[i].classList.add("is-wrong");
     if (right) quiz.score += 1;
     recordResult(q.topic, right);
-    $("quizFeedback").textContent = right ? "Correct." : `Not quite. The card says: ${q.answer}`;
+    $("quizFeedback").textContent = right ? "Correct — answer saved." : `Not quite. Correct answer: ${q.answer}`;
+    const completed = Math.round(((quiz.index + 1) / quiz.items.length) * 100);
+    $("quizProgressFill").style.width = `${completed}%`;
+    $("quizStage").querySelector("[role=progressbar]").setAttribute("aria-valuenow", String(completed));
     $("quizAction").hidden = false;
-    $("quizAction").textContent = quiz.index + 1 < quiz.items.length ? "Next" : "See result";
-  }
-
-  function gradeCloze(score) {
-    const q = quiz.items[quiz.index];
-    quiz.score += score;
-    recordResult(q.topic, score === 1);
-    advance();
+    $("quizAction").textContent = quiz.index + 1 < quiz.items.length ? "Next question" : "Finish quiz";
   }
 
   function advance() {
@@ -303,20 +311,50 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function saveResults() {
-    const rows = [...quiz.results.values()].filter((r) => r.seen > 0);
+    const rows = [...quiz.results.values()].filter((r) => r.seen > 0 && !quiz.savedTopicIds.has(r.topic.id));
     $("quizRetry").hidden = true;
+    $("quizAgain").disabled = true;
     $("quizSaveNote").textContent = "Saving to your account…";
     try {
-      await Promise.all(rows.map((r) => S.api("/learning-events", {
-        method: "POST",
-        body: { student_id: me.id, topic_id: r.topic.id, questions_seen: r.seen, questions_correct: r.correct },
-      })));
-      $("quizSaveNote").textContent = `Saved ${rows.length} topic result${rows.length === 1 ? "" : "s"} to your account. Forecasts update from here.`;
+      for (const r of rows) {
+        await S.api("/learning-events", {
+          method: "POST",
+          body: { student_id: me.id, topic_id: r.topic.id, questions_seen: r.seen, questions_correct: r.correct },
+        });
+        quiz.savedTopicIds.add(r.topic.id);
+      }
       events = await S.api(`/learning-events?student_id=${me.id}`);
       quiz.saved = true;
+      const savedCount = quiz.savedTopicIds.size;
+      $("quizSaveNote").textContent = `Saved ${savedCount} topic result${savedCount === 1 ? "" : "s"}. Your answers are now included in the next-session model input; the model weights are not retrained after each quiz.`;
+      $("quizDashboardLink").hidden = false;
+      await refreshQuizForecast();
+      $("quizAgain").disabled = false;
     } catch (err) {
-      $("quizSaveNote").textContent = `Could not save: ${err.message}`;
+      $("quizSaveNote").textContent = `Could not save every result: ${err.message}`;
       $("quizRetry").hidden = false;
+      $("quizAgain").disabled = false;
+    }
+  }
+
+  async function refreshQuizForecast() {
+    const impact = $("quizModelImpact");
+    impact.hidden = false;
+    impact.innerHTML = '<p class="muted">Refreshing your topic forecasts…</p>';
+    try {
+      const response = await S.api(`/recommendations/${me.id}`);
+      const affected = response.recommendations.filter((item) => quiz.results.has(item.topic_id));
+      impact.innerHTML = `<h3>Updated from this quiz</h3>${affected.map((item) => {
+        const prediction = item.next_session_prediction;
+        if (!prediction?.available) {
+          return `<p><strong>${esc(item.topic_name)}:</strong> answers saved; forecast unavailable right now. ${esc(prediction?.reason || "")}</p>`;
+        }
+        const score = Number(prediction.current_predicted_score);
+        const scoreText = Number.isFinite(score) ? `${Math.round(score * 100)}%` : "unavailable";
+        return `<p><strong>${esc(item.topic_name)}:</strong> estimated next-session score ${scoreText} · suggested review in ${esc(prediction.recommended_review_in_days)} day(s).</p>`;
+      }).join("")}`;
+    } catch (err) {
+      impact.innerHTML = `<p>Your quiz answers were saved as model inputs. The forecast could not be refreshed right now: ${esc(err.message)}</p>`;
     }
   }
 
@@ -324,11 +362,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("quizStage").hidden = true;
     $("quizResult").hidden = false;
     const n = quiz.items.length;
-    const fully = [...quiz.results.values()].reduce((a, r) => a + r.correct, 0);
-    const total = [...quiz.results.values()].reduce((a, r) => a + r.seen, 0);
-    $("quizScore").textContent = quiz.items[0].type === "choice"
-      ? `${quiz.score} / ${n}`
-      : `${fully} / ${total} fully`;
+    $("quizScore").textContent = `${quiz.score} / ${n}`;
+    $("quizAgain").disabled = true;
     $("quizBreakdown").innerHTML = [...quiz.results.values()].map((r) => `<li class="row">
         <div><strong>${esc(r.topic.topic_name)}</strong><span class="muted">${r.correct} of ${r.seen} counted as correct</span></div>
       </li>`).join("");
@@ -339,37 +374,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const count = Number($("quizCount").value);
     const items = buildQuiz(count);
     if (!items) {
-      S.toast("Add a flashcard to a topic first.", "error");
       $("quizHint").hidden = false;
       return;
     }
-    quiz = { items, index: 0, score: 0, results: new Map(), saved: false };
+    quiz = { items, index: 0, score: 0, results: new Map(), saved: false, savedTopicIds: new Set() };
     showStage();
     renderQuestion();
   });
 
   $("quizAction").addEventListener("click", () => {
-    const q = quiz.items[quiz.index];
-    if (q.type === "cloze" && $("quizReveal").hidden) {
-      $("quizAnswer").textContent = q.answer;
-      $("quizReveal").hidden = false;
-      $("quizGrade").hidden = false;
-      $("quizAction").hidden = true;
-      return;
-    }
     advance();
   });
-
-  $("quizGrade").querySelectorAll("[data-score]").forEach((b) =>
-    b.addEventListener("click", () => gradeCloze(Number(b.dataset.score)))
-  );
 
   $("quizRetry").addEventListener("click", saveResults);
   $("quizAgain").addEventListener("click", () => {
     quiz = null;
     $("quizResult").hidden = true;
     $("quizSetup").hidden = false;
-    $("quizHint").hidden = topics.some((t) => L.cards(me.id)[String(t.id)]);
+    $("quizModelImpact").hidden = true;
+    $("quizDashboardLink").hidden = true;
+    refreshQuizAvailability();
   });
 
   // ---------- Wiring ----------
@@ -421,7 +445,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("studyTopic").disabled = topics.length === 0;
     $("manualStudyTopic").disabled = topics.length === 0;
     $("manualStudySave").disabled = topics.length === 0;
-    $("quizHint").hidden = topics.some((t) => L.cards(me.id)[String(t.id)]);
+    refreshQuizAvailability();
     resetTimer();
     renderLog();
     if (location.hash === "#quiz") $("quiz").scrollIntoView();

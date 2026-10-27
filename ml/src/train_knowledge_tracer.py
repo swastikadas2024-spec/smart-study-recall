@@ -1,7 +1,8 @@
-"""Train/evaluate a causal LSTM or Transformer knowledge tracer.
+"""Train/evaluate an MLP, causal LSTM, or Transformer knowledge tracer.
 
 Example:
   python ml/src/train_knowledge_tracer.py --architecture lstm --max-epochs 8
+  python ml/src/train_knowledge_tracer.py --architecture mlp --optimizer rmsprop
 
 The target is an interaction's observed session-correct fraction, not delayed
 recall. The script uses sampled Duolingo events and writes separate artifacts.
@@ -92,12 +93,20 @@ def load_sample(sample_modulus: int, chunk_size: int = 250_000) -> tuple[pd.Data
 
 def make_splits(frame: pd.DataFrame, protocol: str, seed: int):
     if protocol == "forward_time":
-        order = np.argsort(frame.timestamp.to_numpy(), kind="stable")
+        timestamps = frame.timestamp.to_numpy()
+        order = np.argsort(timestamps, kind="stable")
         n = len(order)
+        # Snap cutoffs to a timestamp boundary so simultaneous records cannot
+        # straddle train/validation/test or leak their item IDs into train vocab.
+        train_start_validation = timestamps[order[int(n * 0.70)]]
+        validation_start_test = timestamps[order[int(n * 0.85)]]
         return (
-            order[:int(n * 0.70)],
-            order[int(n * 0.70):int(n * 0.85)],
-            order[int(n * 0.85):],
+            np.flatnonzero(timestamps < train_start_validation),
+            np.flatnonzero(
+                (timestamps >= train_start_validation)
+                & (timestamps < validation_start_test)
+            ),
+            np.flatnonzero(timestamps >= validation_start_test),
         )
     users = frame.user_id.astype(str).unique().to_numpy(dtype=str)
     rng = np.random.default_rng(seed)
@@ -173,6 +182,7 @@ def train_deep(
     batch_size: int,
     item_count: int,
     device,
+    optimizer_name: str = "adamw",
 ):
     random.seed(seed)
     np.random.seed(seed)
@@ -203,20 +213,32 @@ def train_deep(
     vl = torch.from_numpy(val_lengths).to(device)
     vy = torch.from_numpy(val_y).to(device)
     vs = torch.from_numpy(val_seen).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+    optimizer_types = {
+        "adamw": lambda: torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4),
+        "adam": lambda: torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4),
+        "rmsprop": lambda: torch.optim.RMSprop(model.parameters(), lr=0.001, weight_decay=1e-4),
+        "sgd": lambda: torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4),
+    }
+    optimizer = optimizer_types[optimizer_name]()
     best_loss = float("inf")
     best_state = None
     best_epoch = 0
     stale = 0
     patience = 2
+    history = []
     for epoch in range(1, max_epochs + 1):
         model.train()
+        train_loss_sum = 0.0
+        train_weight_sum = 0.0
         for xb, lengths, yb, seen in loader:
             xb, lengths, yb, seen = xb.to(device), lengths.to(device), yb.to(device), seen.to(device)
             optimizer.zero_grad(set_to_none=True)
             pred = model(xb, lengths).clamp(1e-6, 1 - 1e-6)
             loss = torch.nn.functional.binary_cross_entropy(pred, yb, reduction="none")
             loss = (loss * seen).sum() / seen.sum().clamp_min(1)
+            batch_weight = float(seen.sum().item())
+            train_loss_sum += float(loss.detach().item()) * batch_weight
+            train_weight_sum += batch_weight
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
@@ -224,6 +246,12 @@ def train_deep(
         with torch.no_grad():
             pred = model(vx, vl).clamp(1e-6, 1 - 1e-6)
             val_loss = float((torch.nn.functional.binary_cross_entropy(pred, vy, reduction="none") * vs).sum().div(vs.sum()).item())
+        train_loss = train_loss_sum / max(train_weight_sum, 1.0)
+        history.append({
+            "epoch": epoch,
+            "train_weighted_binomial_loss": train_loss,
+            "validation_weighted_binomial_loss": val_loss,
+        })
         if val_loss < best_loss:
             best_loss = val_loss
             best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
@@ -234,14 +262,15 @@ def train_deep(
             if stale >= patience:
                 break
         print(
-            f"epoch {epoch}/{max_epochs}: validation weighted binomial loss={val_loss:.5f}",
+            f"epoch {epoch}/{max_epochs}: train weighted binomial loss={train_loss:.5f}; "
+            f"validation weighted binomial loss={val_loss:.5f}",
             flush=True,
         )
     if best_state is None:
         raise RuntimeError("Training did not produce a finite validation checkpoint.")
     model.load_state_dict(best_state)
     model.eval()
-    return model, scaler, best_epoch, best_loss
+    return model, scaler, best_epoch, best_loss, history
 
 
 def predict_deep(model, scaler, windows, lengths, device, batch_size=1024):
@@ -261,7 +290,8 @@ def predict_deep(model, scaler, windows, lengths, device, batch_size=1024):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--architecture", choices=["lstm", "transformer"], default="lstm")
+    parser.add_argument("--architecture", choices=["mlp", "lstm", "transformer"], default="lstm")
+    parser.add_argument("--optimizer", choices=["adamw", "adam", "rmsprop", "sgd"], default="adamw")
     parser.add_argument("--sample-modulus", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-epochs", type=int, default=8)
@@ -281,6 +311,13 @@ def main():
     )
     split = make_splits(frame, args.protocol, args.seed)
     train_i, val_i, test_i = split
+    split_boundaries = None
+    if args.protocol == "forward_time":
+        split_boundaries = {
+            "validation_start_timestamp": float(frame.timestamp.iloc[val_i].min()),
+            "test_start_timestamp": float(frame.timestamp.iloc[test_i].min()),
+            "rule": "event-count quantile cutoffs snapped to complete timestamp groups",
+        }
     item_to_index = {item: index + 2 for index, item in enumerate(sorted(frame.lexeme_id.iloc[train_i].astype(str).unique()))}
     windows, lengths, target, seen, users = build_sequences(
         frame, item_to_index, args.sequence_length
@@ -308,15 +345,16 @@ def main():
     print(f"Fitted same-task Random Forest baseline in {time.time() - started:.1f}s.", flush=True)
     rf_predictions = np.clip(rf.predict(test_features), 0, 1)
 
-    model, scaler, best_epoch, best_val_loss = train_deep(
+    model, scaler, best_epoch, best_val_loss, training_history = train_deep(
         args.architecture, train_x, train_l, train_y, train_seen,
         val_x, val_l, val_y, val_seen, args.seed, args.max_epochs,
-        args.batch_size, item_count, device,
+        args.batch_size, item_count, device, args.optimizer,
     )
     val_predictions = predict_deep(model, scaler, val_x, val_l, device)
     test_predictions = predict_deep(model, scaler, test_x, test_l, device)
     metadata = {
         "architecture": args.architecture,
+        "optimizer": args.optimizer,
         "target": "next interaction session_correct / session_seen",
         "target_is_delayed_recall": False,
         "source_dataset": "Duolingo Learning Traces",
@@ -331,6 +369,7 @@ def main():
         "sequence_length": args.sequence_length,
         "numeric_features": list(NUMERIC_FEATURES),
         "protocol": args.protocol,
+        "split_boundaries": split_boundaries,
         "split_sizes": {"train": len(train_i), "validation": len(val_i), "test": len(test_i)},
         "split_learners": {
             name: int(frame.user_id.iloc[index].nunique())
@@ -340,6 +379,7 @@ def main():
         "requested_max_epochs": args.max_epochs,
         "best_epoch": best_epoch,
         "best_validation_binomial_loss": best_val_loss,
+        "training_history": training_history,
         "device": str(device),
         "selection": "early stopping on validation weighted binomial log loss; report metrics never select the checkpoint",
         "metrics": {
@@ -355,7 +395,8 @@ def main():
         ],
     }
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODEL_DIR / f"knowledge_tracer_{args.architecture}_{args.protocol}.pt"
+    optimizer_suffix = "" if args.optimizer == "adamw" else f"_{args.optimizer}"
+    model_path = MODEL_DIR / f"knowledge_tracer_{args.architecture}{optimizer_suffix}_{args.protocol}.pt"
     torch.save({
         "state_dict": model.state_dict(),
         "item_count": item_count,
@@ -373,7 +414,7 @@ def main():
     metadata["artifact"] = str(model_path.relative_to(ROOT)).replace("\\", "/")
     metadata["artifact_sha256"] = hashlib.sha256(model_path.read_bytes()).hexdigest()
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = REPORT_DIR / f"knowledge_tracing_{args.architecture}_{args.protocol}_evaluation.json"
+    report_path = REPORT_DIR / f"knowledge_tracing_{args.architecture}{optimizer_suffix}_{args.protocol}_evaluation.json"
     report_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"Wrote evaluation report to {report_path.relative_to(ROOT)}")
     print(json.dumps(metadata, indent=2))

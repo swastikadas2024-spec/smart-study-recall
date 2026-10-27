@@ -60,7 +60,7 @@ smart-study-recall/
     └── src/
         ├── api.py            ML web service
         ├── next_session_model.py  HLR/GRU next-session score contract
-        ├── knowledge_tracing.py   LSTM and Transformer sequence candidates
+        ├── knowledge_tracing.py   MLP, LSTM and Transformer KT candidates
         └── train_knowledge_tracer.py
 ```
 
@@ -75,7 +75,7 @@ smart-study-recall/
 
 ### 1. Set up the database
 
-1. In Supabase, open **SQL Editor** and run `migrations/002_topic_subject_and_reschedule.sql`, then `migrations/003_ai_study_materials.sql`.
+1. In Supabase, open **SQL Editor** and run `migrations/002_topic_subject_and_reschedule.sql`, then `migrations/003_ai_study_materials.sql`, then `migrations/004_rag_chat_history.sql` to enable persistent chatbot history and saved source-support feedback.
 2. Any signed-in user can upload materials; no faculty role change is needed. Published materials appear in the shared library for all signed-in users. Unpublished materials remain visible only to their uploader.
 3. Copy the connection string from **Project Settings → Database** (URI format). URL-encode any special characters in the password.
 
@@ -190,18 +190,21 @@ The dashboard also plots each studied topic's predicted next-session score over 
 
 ## Knowledge-tracing research prototype
 
-`ml/src/knowledge_tracing.py` implements causal PyTorch LSTM and Transformer candidates for predicting the next observed Duolingo interaction's session-correct fraction. Run one candidate with:
+`ml/src/knowledge_tracing.py` implements a PyTorch MLP baseline, LSTM and Transformer for predicting the next observed Duolingo interaction's session-correct fraction. Example training commands:
 
 ```powershell
+.\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture mlp --protocol forward_time
 .\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture lstm --protocol forward_time
 .\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture transformer --protocol forward_time
 ```
+
+The trainer supports AdamW, Adam, RMSProp and SGD with momentum. Its recorded one-seed optimizer comparison is in `docs/RESULTS.md`.
 
 The script streams the local gzip file and defaults to a deterministic 1-in-100 learner sample. It writes per-protocol artifacts and actual metrics under `ml/models/` and `ml/reports/`. The ML API exposes `POST /predict/knowledge-tracing` after the corresponding artifacts are trained. This next-interaction task is not delayed retention, and Duolingo lexeme IDs do not map to app course topics. The KT models therefore are not wired into the course-topic forgetting-date dashboard. The current runs use one seed and remain experimental; see `docs/RESULTS.md`.
 
 ## Research documentation
 
-See `docs/IMPLEMENTATION_AUDIT.md`, `docs/RESEARCH_PROPOSAL.md`, `docs/MODEL_ARCHITECTURE.md`, `docs/DATASET_AND_PREPROCESSING.md`, `docs/EXPERIMENT_PROTOCOL.md`, `docs/RESULTS.md`, `docs/API.md`, `docs/SETUP.md`, and `docs/RESEARCH_LIMITATIONS.md` for the audit, model/data contracts, protocols and limitations.
+See `docs/RECENT_COMMIT_REVIEW.md`, `docs/IMPLEMENTATION_AUDIT.md`, `docs/RESEARCH_PROPOSAL.md`, `docs/MODEL_ARCHITECTURE.md`, `docs/DATASET_AND_PREPROCESSING.md`, `docs/EXPERIMENT_PROTOCOL.md`, `docs/RESULTS.md`, `docs/API.md`, `docs/SETUP.md`, and `docs/RESEARCH_LIMITATIONS.md` for the commit audit, model/data contracts, protocols and limitations.
 
 ## Data storage
 

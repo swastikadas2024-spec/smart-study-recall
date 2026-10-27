@@ -10,14 +10,24 @@ Install the repository requirements, place the licensed Duolingo Learning Traces
 .\.venv\Scripts\python.exe ml\src\train_next_session_model.py
 ```
 
-The job streams the dataset and uses a deterministic 1-in-100 learner sample by default. The JSON report and validation-selected artifact are written under `ml/reports/` and `ml/models/`. Start the ML API from `ml/src` on port 8000; start the app API from the repo root on port 8002; serve `frontend/` on port 5500.
+The job streams the dataset and uses a deterministic 1-in-100 learner sample by default. The JSON report and validation-selected artifact are written under `ml/reports/` and `ml/models/`. To start the ML API from the repository root in PowerShell, change into `ml/src` first so the relative virtual-environment path resolves correctly:
+
+```powershell
+Set-Location .\ml\src
+..\..\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
+```
+
+Start the app API from the repo root on port 8002; serve `frontend/` on port 5500. If port 8000 is already occupied, stop the older ML API in its terminal with Ctrl+C, then run the command above.
 
 For the separate KT candidates:
 
 ```powershell
+.\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture mlp --protocol forward_time
 .\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture lstm --protocol forward_time
 .\.venv\Scripts\python.exe ml\src\train_knowledge_tracer.py --architecture transformer --protocol forward_time
 ```
+
+The trainer supports `mlp`, `lstm` and `transformer` architectures. Run the MLP optimizer comparison with `--optimizer adamw`, `adam`, `rmsprop` and `sgd` (momentum 0.9), holding `--sample-modulus 100 --seed 42 --max-epochs 3` fixed. Recorded results are in `docs/RESULTS.md`.
 
 Use `--protocol learner_held_out` for a disjoint learner split. The default hash sample is 1-in-100; `--sample-modulus N` changes it explicitly. Each run writes a model checkpoint and a JSON report named for its architecture and split. Reports identify the single seed/configuration used.
 
